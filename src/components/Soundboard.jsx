@@ -30,15 +30,14 @@ export default function Soundboard({
   }, [visible, friends]);
 
   return (
-    <div className="space-y-5">
+    <div className={playOnly ? "space-y-3" : "space-y-5"}>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-        <FilterPill large={playOnly} active={filter === "all"} onClick={() => setFilter("all")}>
+        <FilterPill active={filter === "all"} onClick={() => setFilter("all")}>
           All
         </FilterPill>
         {friends.map((friend) => (
           <FilterPill
             key={friend.id}
-            large={playOnly}
             active={filter === friend.id}
             onClick={() => setFilter(friend.id)}
             color={friend.color}
@@ -69,8 +68,8 @@ export default function Soundboard({
           const items = grouped.get(friend.id) || [];
           if (!items.length) return null;
           return (
-            <section key={friend.id} className="space-y-3">
-              <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            <section key={friend.id} className={playOnly ? "space-y-1.5" : "space-y-3"}>
+              <h2 className={`flex items-center gap-2 font-semibold uppercase tracking-[0.18em] text-zinc-500 ${playOnly ? "text-[10px]" : "text-xs"}`}>
                 <span className="h-2 w-2 rounded-full" style={{ background: friend.color }} />
                 {friend.name}
               </h2>
@@ -112,7 +111,7 @@ function Grid({ children, playOnly }) {
     <div
       className={
         playOnly
-          ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
+          ? "grid grid-cols-3 gap-2"
           : "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
       }
     >

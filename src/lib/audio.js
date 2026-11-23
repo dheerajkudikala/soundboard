@@ -2,6 +2,12 @@ let ctx;
 const buffers = new Map();
 const sources = new Map();
 const listeners = new Set();
+const primedUrls = new Map();
+let playToken = 0;
+let primed = false;
+
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
 export function getAudioContext() {
   if (!ctx) {
@@ -17,6 +23,19 @@ export function unlockAudio() {
     if (audio.state === "suspended") audio.resume();
   } catch {
     /* ignore */
+  }
+  if (primed) return;
+  primed = true;
+  try {
+    const el = new Audio(SILENT_WAV);
+    el.playsInline = true;
+    el.setAttribute("playsinline", "true");
+    el.volume = 0.01;
+    el.play().catch(() => {
+      primed = false;
+    });
+  } catch {
+    primed = false;
   }
 }
 
@@ -38,6 +57,11 @@ export async function decodeBlob(blob) {
 
 export function invalidateBuffer(id) {
   buffers.delete(id);
+  const url = primedUrls.get(id);
+  if (url) {
+    URL.revokeObjectURL(url);
+    primedUrls.delete(id);
+  }
 }
 
 export async function cacheClip(id, blob) {
@@ -45,6 +69,18 @@ export async function cacheClip(id, blob) {
   const buffer = await decodeBlob(blob);
   buffers.set(id, buffer);
   return buffer;
+}
+
+export function primeClip(id, blob) {
+  if (!blob) return primedUrls.get(id);
+  if (primedUrls.has(id)) return primedUrls.get(id);
+  const url = URL.createObjectURL(blob);
+  primedUrls.set(id, url);
+  return url;
+}
+
+export function hasPrimedClip(id) {
+  return primedUrls.has(id);
 }
 
 export function stopClip(id) {
@@ -57,11 +93,10 @@ export function stopClip(id) {
   }
   try {
     rec.el?.pause?.();
-    if (rec.el) rec.el.src = "";
   } catch {
     /* ignore */
   }
-  if (rec.url) URL.revokeObjectURL(rec.url);
+  if (rec.url && !primedUrls.has(id)) URL.revokeObjectURL(rec.url);
   try {
     rec.gain?.disconnect?.();
     rec.node?.disconnect?.();
@@ -76,7 +111,15 @@ export function stopAll() {
   for (const id of [...sources.keys()]) stopClip(id);
 }
 
-let playToken = 0;
+function attachElement(id, el, url) {
+  const finish = () => {
+    if (sources.get(id)?.el === el) stopClip(id);
+  };
+  el.addEventListener("ended", finish);
+  el.addEventListener("error", finish);
+  sources.set(id, { source: null, el, url, node: null, gain: null });
+  emit();
+}
 
 export async function playClip(id, blob, fx = {}) {
   unlockAudio();
@@ -85,35 +128,36 @@ export async function playClip(id, blob, fx = {}) {
   const volume = Number.isFinite(fx.volume) ? fx.volume : 1;
   const rate = Number.isFinite(fx.playbackRate) ? fx.playbackRate : 1;
   const preservePitch = fx.preservePitch !== false;
-  const audio = getAudioContext();
+  const url = primedUrls.get(id) || (blob ? primeClip(id, blob) : null);
+  if (!url) return;
 
-  if (preservePitch && Math.abs(rate - 1) > 0.001) {
-    const url = URL.createObjectURL(blob);
-    const el = new Audio();
-    el.src = url;
-    el.preservesPitch = true;
-    el.webkitPreservesPitch = true;
-    el.mozPreservesPitch = true;
-    el.playbackRate = Math.min(2, Math.max(0.5, rate));
-    const node = audio.createMediaElementSource(el);
-    const gain = audio.createGain();
-    gain.gain.value = volume;
-    node.connect(gain);
-    gain.connect(audio.destination);
-    const finish = () => {
-      if (sources.get(id)?.el === el) stopClip(id);
-    };
-    el.addEventListener("ended", finish);
-    sources.set(id, { source: null, el, url, node, gain });
-    emit();
+  const el = new Audio();
+  el.playsInline = true;
+  el.setAttribute("playsinline", "true");
+  el.setAttribute("webkit-playsinline", "true");
+  el.preload = "auto";
+  el.src = url;
+  el.volume = Math.max(0, Math.min(1, volume));
+  el.playbackRate = Math.min(2, Math.max(0.5, rate));
+  el.preservesPitch = preservePitch;
+  el.webkitPreservesPitch = preservePitch;
+  attachElement(id, el, url);
+  try {
     await el.play();
-    if (token !== playToken) {
-      stopClip(id);
-      return;
-    }
+  } catch {
+    if (token !== playToken) return;
+    await playViaWebAudio(id, blob, { volume, rate, token });
     return;
   }
+  if (token !== playToken) {
+    stopClip(id);
+  }
+}
 
+async function playViaWebAudio(id, blob, { volume, rate, token }) {
+  if (!blob) return;
+  const audio = getAudioContext();
+  await audio.resume();
   const buffer = await cacheClip(id, blob);
   if (token !== playToken) return;
   const source = audio.createBufferSource();
@@ -141,5 +185,6 @@ export function isPlaying(id) {
 if (typeof window !== "undefined") {
   const unlock = () => unlockAudio();
   window.addEventListener("touchstart", unlock, { passive: true });
+  window.addEventListener("touchend", unlock, { passive: true });
   window.addEventListener("click", unlock);
 }

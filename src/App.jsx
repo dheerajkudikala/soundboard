@@ -50,7 +50,7 @@ export default function App() {
   }
 
   return (
-    <div className={`mx-auto flex min-h-[100dvh] flex-col ${desktop ? "max-w-5xl" : "max-w-xl"}`}>
+    <div className={`mx-auto flex min-h-[100dvh] flex-col ${desktop ? "max-w-5xl" : "max-w-lg"}`}>
       <header className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950/85 px-4 pb-3 pt-3 backdrop-blur-md">
         <div className="flex items-center justify-between gap-3">
           <div>

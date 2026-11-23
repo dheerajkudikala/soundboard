@@ -1,7 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getClipBlob } from "../lib/db";
-import { onPlaybackChange, playClip, stopClip } from "../lib/audio";
+import { hasPrimedClip, onPlaybackChange, playClip, primeClip, stopClip, unlockAudio } from "../lib/audio";
 
 export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
   const [playing, setPlaying] = useState(false);
@@ -10,17 +10,33 @@ export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
     return onPlaybackChange((ids) => setPlaying(ids.includes(clip.id)));
   }, [clip.id]);
 
-  async function trigger() {
-    const blob = await getClipBlob(clip.id);
-    if (!blob) return;
+  useEffect(() => {
+    let dead = false;
+    getClipBlob(clip.id).then((blob) => {
+      if (!dead && blob) primeClip(clip.id, blob);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [clip.id]);
+
+  function trigger() {
+    unlockAudio();
     if (playing) {
       stopClip(clip.id);
       return;
     }
-    await playClip(clip.id, blob, {
+    const fx = {
       volume: clip.volume ?? 1,
       playbackRate: clip.playbackRate ?? 1,
       preservePitch: clip.preservePitch !== false,
+    };
+    if (hasPrimedClip(clip.id)) {
+      void playClip(clip.id, null, fx);
+      return;
+    }
+    void getClipBlob(clip.id).then((blob) => {
+      if (blob) return playClip(clip.id, blob, fx);
     });
   }
 
@@ -29,24 +45,24 @@ export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
       <button
         type="button"
         onClick={trigger}
-        className={`flex w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 text-left shadow-lg shadow-indigo-500/5 transition active:scale-[0.98] ${
-          playOnly ? "min-h-[132px] p-5" : "min-h-[88px] p-3"
+        className={`flex w-full flex-col justify-between overflow-hidden border border-white/10 bg-zinc-900/80 text-left shadow-lg shadow-indigo-500/5 transition active:scale-[0.98] ${
+          playOnly ? "min-h-[84px] rounded-xl p-2" : "min-h-[88px] rounded-2xl p-3"
         }`}
         style={{ boxShadow: playing ? `0 0 0 1px ${friend?.color || "#818cf8"}` : undefined }}
       >
         <div className="flex items-start justify-between">
           <span
-            className="h-2.5 w-2.5 rounded-full"
+            className={`rounded-full ${playOnly ? "h-1.5 w-1.5" : "h-2.5 w-2.5"}`}
             style={{ background: friend?.color || "#818cf8" }}
           />
           {playing ? (
-            <span className="pad-eq flex h-5 items-end gap-0.5">
+            <span className={`pad-eq flex items-end gap-0.5 ${playOnly ? "h-3" : "h-5"}`}>
               <span className="h-full w-0.5 origin-bottom rounded-full bg-indigo-300" />
               <span className="h-full w-0.5 origin-bottom rounded-full bg-indigo-300" />
               <span className="h-full w-0.5 origin-bottom rounded-full bg-indigo-300" />
             </span>
           ) : playOnly ? (
-            <span className="h-5" />
+            <span className="h-3" />
           ) : (
             <span className="text-[10px] text-zinc-500">
               {clip.playbackRate && clip.playbackRate !== 1 ? `${Number(clip.playbackRate).toFixed(2)}x · ` : ""}
@@ -54,7 +70,11 @@ export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
             </span>
           )}
         </div>
-        <p className={`line-clamp-2 font-medium leading-snug text-zinc-100 ${playOnly ? "text-xl" : "text-sm"}`}>
+        <p
+          className={`font-medium leading-snug text-zinc-100 ${
+            playOnly ? "mt-1 line-clamp-3 text-[11px]" : "line-clamp-2 text-sm"
+          }`}
+        >
           {clip.title}
         </p>
       </button>
