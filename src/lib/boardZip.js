@@ -50,31 +50,31 @@ export async function importBoardZip(file) {
   await replaceBoard({ friends, clips });
 }
 
+const BUNDLE_ID = "board-2026-11-23";
+
 export async function importBundledManifest() {
   try {
     const res = await fetch("./sounds/manifest.json");
     if (!res.ok) return;
     const manifest = await res.json();
     const already = await db.meta.get("bundled");
-    if (already) return;
+    if (already?.value === BUNDLE_ID) return;
     if (!manifest.clips?.length && !manifest.friends?.length) {
-      await db.meta.put({ key: "bundled", value: true });
+      await db.meta.put({ key: "bundled", value: BUNDLE_ID });
       return;
     }
     const localClips = await db.clips.count();
     if (localClips > 0) {
-      await db.meta.put({ key: "bundled", value: true });
+      await db.meta.put({ key: "bundled", value: BUNDLE_ID });
       return;
     }
 
-    const friends = await Promise.all(
-      (manifest.friends || []).map(async (f, i) => ({
-        id: f.id || uid(),
-        name: f.name,
-        color: f.color,
-        createdAt: Date.now() + i,
-      }))
-    );
+    const friends = (manifest.friends || []).map((f, i) => ({
+      id: f.id || uid(),
+      name: f.name,
+      color: f.color,
+      createdAt: f.createdAt || Date.now() + i,
+    }));
     const clips = [];
     for (const clip of manifest.clips || []) {
       const audioRes = await fetch(`./sounds/${clip.file}`);
@@ -86,13 +86,16 @@ export async function importBundledManifest() {
         friendId: clip.friendId,
         duration: clip.duration || 0,
         createdAt: clip.createdAt || Date.now(),
+        volume: clip.volume ?? 1,
+        playbackRate: clip.playbackRate ?? 1,
+        preservePitch: clip.preservePitch !== false,
         blob,
       });
     }
     if ((friends.length || clips.length) && (await db.clips.count()) === 0) {
       await replaceBoard({ friends, clips });
     }
-    await db.meta.put({ key: "bundled", value: true });
+    await db.meta.put({ key: "bundled", value: BUNDLE_ID });
   } catch (error) {
     console.warn("Bundled sounds skipped", error);
   }
