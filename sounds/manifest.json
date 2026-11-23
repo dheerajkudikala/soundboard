@@ -1,4 +1,317 @@
 {
-  "friends": [],
-  "clips": []
+  "version": 2,
+  "friends": [
+    {
+      "color": "#818cf8",
+      "createdAt": 1795395141239,
+      "id": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "name": "Kushith"
+    },
+    {
+      "color": "#34d399",
+      "createdAt": 1795462658252,
+      "id": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "name": "Snehansh"
+    },
+    {
+      "color": "#f472b6",
+      "createdAt": 1795465519735,
+      "id": "de1fc63a-4730-4e39-bfb8-07f04e76ae10",
+      "name": "Swapna Aunty"
+    },
+    {
+      "color": "#a78bfa",
+      "createdAt": 1795462654954,
+      "id": "e1f6c501-c77d-4ac6-9742-02d78f82c5d1",
+      "name": "Sai"
+    }
+  ],
+  "clips": [
+    {
+      "id": "06b6c456-9e6b-4172-adda-f23e8a4f7b35",
+      "title": "What?",
+      "friendId": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "duration": 0.46,
+      "createdAt": 1795465901022,
+      "file": "06b6c456-9e6b-4172-adda-f23e8a4f7b35.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "0a8bb4a4-5db6-4d8e-87e5-7e9ce993081e",
+      "title": "Vani thanutha veni thanutha guddhadengutha",
+      "friendId": "e1f6c501-c77d-4ac6-9742-02d78f82c5d1",
+      "duration": 2.84,
+      "createdAt": 1795463698384,
+      "file": "0a8bb4a4-5db6-4d8e-87e5-7e9ce993081e.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "10f379e6-dd7d-4ee3-8afb-a6387b1e2869",
+      "title": "I didn't even drive the car",
+      "friendId": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "duration": 1.24,
+      "createdAt": 1795465901017,
+      "file": "10f379e6-dd7d-4ee3-8afb-a6387b1e2869.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "2ee12379-7d84-4342-aa8b-a25010a1ef34",
+      "title": "Meow Meow",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 0.95525,
+      "createdAt": 1795464876270,
+      "file": "2ee12379-7d84-4342-aa8b-a25010a1ef34.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "2f8e6932-f191-4e53-af11-a6f2df9ba3e7",
+      "title": "Are you recording?",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 0.5,
+      "createdAt": 1795462884143,
+      "file": "2f8e6932-f191-4e53-af11-a6f2df9ba3e7.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "392df14c-6468-4d95-8749-6d973b9d8cbc",
+      "title": "I dont know the song bruh",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 0.9865,
+      "createdAt": 1795463442510,
+      "file": "392df14c-6468-4d95-8749-6d973b9d8cbc.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "3a11df85-7e8d-4877-b790-badace1445cf",
+      "title": "Evala oddhana weekend kalustamu",
+      "friendId": "de1fc63a-4730-4e39-bfb8-07f04e76ae10",
+      "duration": 2.447875,
+      "createdAt": 1795467858614,
+      "file": "3a11df85-7e8d-4877-b790-badace1445cf.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "43203f69-ac96-44f2-929e-d86e3c719f22",
+      "title": "This video is made by Sora AI",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 1.84,
+      "createdAt": 1795464876245,
+      "file": "43203f69-ac96-44f2-929e-d86e3c719f22.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "435b2930-e54a-4835-b90b-1ebfc3ed59b4",
+      "title": "Sai Oddhu",
+      "friendId": "de1fc63a-4730-4e39-bfb8-07f04e76ae10",
+      "duration": 0.65225,
+      "createdAt": 1795465900995,
+      "file": "435b2930-e54a-4835-b90b-1ebfc3ed59b4.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "45bde921-ebb3-4c2b-8c12-284cc6d2d53b",
+      "title": "Chepte venali",
+      "friendId": "de1fc63a-4730-4e39-bfb8-07f04e76ae10",
+      "duration": 1.137,
+      "createdAt": 1795467858604,
+      "file": "45bde921-ebb3-4c2b-8c12-284cc6d2d53b.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "48b86406-1647-4317-a660-8f10d205e10e",
+      "title": "go go go where?",
+      "friendId": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "duration": 1.547125,
+      "createdAt": 1795465901011,
+      "file": "48b86406-1647-4317-a660-8f10d205e10e.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "5e473011-f8d1-4c05-b50c-ddf42813197b",
+      "title": "I killed like 50 Cops",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 0.94,
+      "createdAt": 1795462884140,
+      "file": "5e473011-f8d1-4c05-b50c-ddf42813197b.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "6176ea72-48de-43e8-84e1-51e05380c965",
+      "title": "Sher mera sher",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 1.854375,
+      "createdAt": 1795463442506,
+      "file": "6176ea72-48de-43e8-84e1-51e05380c965.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "6deed43e-c158-4982-8ce3-6760deb80e5e",
+      "title": "My Bad I don't have it memorized like properly",
+      "friendId": "e1f6c501-c77d-4ac6-9742-02d78f82c5d1",
+      "duration": 2.818125,
+      "createdAt": 1795463698390,
+      "file": "6deed43e-c158-4982-8ce3-6760deb80e5e.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "75720db3-50ee-4d41-9ed9-f585ba8ecf29",
+      "title": "I am fake Sheru Bhai",
+      "friendId": "e1f6c501-c77d-4ac6-9742-02d78f82c5d1",
+      "duration": 1.12,
+      "createdAt": 1795463698392,
+      "file": "75720db3-50ee-4d41-9ed9-f585ba8ecf29.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "8b04b905-88c3-4a2d-904b-ab7dfa3ce3ef",
+      "title": "Nelchoni thantha",
+      "friendId": "e1f6c501-c77d-4ac6-9742-02d78f82c5d1",
+      "duration": 1.17475,
+      "createdAt": 1795463698377,
+      "file": "8b04b905-88c3-4a2d-904b-ab7dfa3ce3ef.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "9a2e584c-b142-4eb9-817a-b332d3346c05",
+      "title": "Why?",
+      "friendId": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "duration": 0.66,
+      "createdAt": 1795465901019,
+      "file": "9a2e584c-b142-4eb9-817a-b332d3346c05.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "a63970a8-fd53-4a9c-a55d-b29d93d10a2f",
+      "title": "Shit bro what the",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 1.003625,
+      "createdAt": 1795463442502,
+      "file": "a63970a8-fd53-4a9c-a55d-b29d93d10a2f.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "abe093e2-e56f-4eeb-9e2d-4d32ab449bed",
+      "title": "Endhuku orristunaru",
+      "friendId": "de1fc63a-4730-4e39-bfb8-07f04e76ae10",
+      "duration": 1.3,
+      "createdAt": 1795465901014,
+      "file": "abe093e2-e56f-4eeb-9e2d-4d32ab449bed.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "ae5bd57c-8280-4198-960c-46f1ac336dcc",
+      "title": "Trillion Billion Quadrillion Dollars",
+      "friendId": "e1f6c501-c77d-4ac6-9742-02d78f82c5d1",
+      "duration": 2.605238095238095,
+      "createdAt": 1795463698388,
+      "file": "ae5bd57c-8280-4198-960c-46f1ac336dcc.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "cf3a29a8-b368-4f5c-b426-6e1217350355",
+      "title": "Takes one to know one",
+      "friendId": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "duration": 1.6198229255774166,
+      "createdAt": 1795465252608,
+      "file": "cf3a29a8-b368-4f5c-b426-6e1217350355.wav",
+      "volume": 3,
+      "playbackRate": 1,
+      "preservePitch": false
+    },
+    {
+      "id": "d7351932-36de-45d5-8a93-6c48e12885c8",
+      "title": "Rey Champutunaru",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 1.3,
+      "createdAt": 1795462884126,
+      "file": "d7351932-36de-45d5-8a93-6c48e12885c8.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "e2106d09-359c-4d12-b488-485800e7571d",
+      "title": "Easy haha",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 1.100125,
+      "createdAt": 1795463442497,
+      "file": "e2106d09-359c-4d12-b488-485800e7571d.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "e5c877c3-181f-419b-943e-bf79e8ebbf84",
+      "title": "Ay mi gatito meow meow",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 1.580125,
+      "createdAt": 1795464876259,
+      "file": "e5c877c3-181f-419b-943e-bf79e8ebbf84.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "e6411127-b53c-49b8-b97c-6c0574e653a2",
+      "title": "Goat Sound",
+      "friendId": "65d4d8bf-c3d6-4a21-8c67-de8c6838b1e7",
+      "duration": 0.42,
+      "createdAt": 1795463442487,
+      "file": "e6411127-b53c-49b8-b97c-6c0574e653a2.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    },
+    {
+      "id": "e6d9fc3b-9a1d-4855-a58e-63b6fe9b8738",
+      "title": "I can drive? OK",
+      "friendId": "99812340-b745-4d8b-b5cb-8ea8e825a22b",
+      "duration": 1.0576741312781657,
+      "createdAt": 1795465901006,
+      "file": "e6d9fc3b-9a1d-4855-a58e-63b6fe9b8738.wav",
+      "volume": 1,
+      "playbackRate": 1,
+      "preservePitch": true
+    }
+  ]
 }
