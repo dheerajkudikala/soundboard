@@ -50,21 +50,26 @@ export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
         }`}
         style={{ boxShadow: playing ? `0 0 0 1px ${friend?.color || "#818cf8"}` : undefined }}
       >
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-1">
           <span
-            className={`rounded-full ${playOnly ? "h-1.5 w-1.5" : "h-2.5 w-2.5"}`}
-            style={{ background: friend?.color || "#818cf8" }}
-          />
+            className={`min-w-0 truncate rounded-md font-semibold ${
+              playOnly ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
+            }`}
+            style={{
+              color: friend?.color || "#c7d2fe",
+              background: `${friend?.color || "#818cf8"}33`,
+            }}
+          >
+            {friend?.name || "Clip"}
+          </span>
           {playing ? (
-            <span className={`pad-eq flex items-end gap-0.5 ${playOnly ? "h-3" : "h-5"}`}>
+            <span className={`pad-eq flex shrink-0 items-end gap-0.5 ${playOnly ? "h-3" : "h-5"}`}>
               <span className="h-full w-0.5 origin-bottom rounded-full bg-indigo-300" />
               <span className="h-full w-0.5 origin-bottom rounded-full bg-indigo-300" />
               <span className="h-full w-0.5 origin-bottom rounded-full bg-indigo-300" />
             </span>
-          ) : playOnly ? (
-            <span className="h-3" />
-          ) : (
-            <span className="text-[10px] text-zinc-500">
+          ) : playOnly ? null : (
+            <span className="shrink-0 text-[10px] text-zinc-500">
               {clip.playbackRate && clip.playbackRate !== 1 ? `${Number(clip.playbackRate).toFixed(2)}x · ` : ""}
               {clip.duration ? `${clip.duration.toFixed(1)}s` : ""}
             </span>

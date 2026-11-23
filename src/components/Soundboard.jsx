@@ -69,8 +69,10 @@ export default function Soundboard({
           if (!items.length) return null;
           return (
             <section key={friend.id} className={playOnly ? "space-y-1.5" : "space-y-3"}>
-              <h2 className={`flex items-center gap-2 font-semibold uppercase tracking-[0.18em] text-zinc-500 ${playOnly ? "text-[10px]" : "text-xs"}`}>
-                <span className="h-2 w-2 rounded-full" style={{ background: friend.color }} />
+              <h2
+                className={`font-semibold uppercase tracking-[0.16em] ${playOnly ? "text-[10px]" : "text-xs"}`}
+                style={{ color: friend.color }}
+              >
                 {friend.name}
               </h2>
               <Grid playOnly={playOnly}>
@@ -127,9 +129,15 @@ function FilterPill({ active, onClick, children, color, large }) {
       onClick={onClick}
       className={`shrink-0 rounded-full font-semibold transition ${
         large ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs"
-      } ${active ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white" : "bg-white/5 text-zinc-300"}`}
+      } ${active ? "text-zinc-950" : "bg-white/5"}`}
+      style={
+        active
+          ? { background: color || "#818cf8", color: "#09090b" }
+          : color
+            ? { color }
+            : undefined
+      }
     >
-      {color ? <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full" style={{ background: color }} /> : null}
       {children}
     </button>
   );
