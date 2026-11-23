@@ -12,6 +12,7 @@ import { useDesktop } from "./hooks/useDesktop.js";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { getClipBlob } from "./lib/db.js";
 import { playClip, stopAll } from "./lib/audio.js";
+import { hasGithubToken, schedulePublish } from "./lib/githubSync.js";
 
 export default function App() {
   const board = useBoard();
@@ -22,6 +23,7 @@ export default function App() {
   const [renameClip, setRenameClip] = useState(null);
   const [editorClip, setEditorClip] = useState(null);
   const [deleteClip, setDeleteClip] = useState(null);
+  const [needsSync, setNeedsSync] = useState(() => typeof window !== "undefined" && !hasGithubToken());
   const friendAddedRef = useRef(null);
 
   useEffect(() => {
@@ -91,6 +93,12 @@ export default function App() {
         ) : null}
       </header>
 
+      {desktop && needsSync ? (
+        <div className="mx-4 mb-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100">
+          Connect GitHub once under Friends / Backup so clips you add here show up on your iPhone.
+        </div>
+      ) : null}
+
       <InstallBanner
         canInstall={install.canInstall}
         showIosTip={install.showIosTip}
@@ -110,7 +118,14 @@ export default function App() {
           />
         )}
         {desktop && tab === "clip" && (
-          <Clipper friends={board.friends} onSaved={board.refresh} onCreateFriend={board.addFriend} />
+          <Clipper
+            friends={board.friends}
+            onSaved={() => {
+              board.refresh();
+              schedulePublish();
+            }}
+            onCreateFriend={board.addFriend}
+          />
         )}
         {desktop && tab === "friends" && (
           <FriendsBackup
@@ -121,7 +136,11 @@ export default function App() {
             onDeleteFriend={(id) => {
               if (window.confirm("Delete this friend and their clips?")) board.deleteFriend(id);
             }}
-            onImported={board.refresh}
+            onImported={() => {
+              board.refresh();
+              schedulePublish();
+            }}
+            onTokenSaved={() => setNeedsSync(!hasGithubToken())}
           />
         )}
       </main>
@@ -173,7 +192,10 @@ export default function App() {
           clip={editorClip}
           friends={board.friends}
           onClose={() => setEditorClip(null)}
-          onSaved={board.refresh}
+          onSaved={() => {
+            board.refresh();
+            schedulePublish();
+          }}
         />
       ) : null}
 

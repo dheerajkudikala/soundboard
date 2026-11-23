@@ -1,10 +1,22 @@
 import { useRef, useState } from "react";
 import { Download, Trash2, Upload } from "lucide-react";
 import { downloadBlob, exportBoardZip, importBoardZip } from "../lib/boardZip";
+import { hasGithubToken, publishBoard, setGithubToken, testGithubToken } from "../lib/githubSync";
 
-export default function FriendsBackup({ friends, clips, onAddFriend, onRenameFriend, onDeleteFriend, onImported }) {
+export default function FriendsBackup({
+  friends,
+  clips,
+  onAddFriend,
+  onRenameFriend,
+  onDeleteFriend,
+  onImported,
+  onTokenSaved,
+}) {
   const fileRef = useRef(null);
   const [status, setStatus] = useState("");
+  const [token, setToken] = useState("");
+  const [connected, setConnected] = useState(() => hasGithubToken());
+  const [savingToken, setSavingToken] = useState(false);
 
   async function exportZip() {
     const blob = await exportBoardZip();
@@ -56,6 +68,80 @@ export default function FriendsBackup({ friends, clips, onAddFriend, onRenameFri
         >
           + Add Friend
         </button>
+      </section>
+
+      <section className="space-y-3 rounded-3xl border border-indigo-400/20 bg-indigo-500/10 p-4">
+        <h2 className="text-sm font-semibold text-white">iPhone sync</h2>
+        <p className="text-xs leading-relaxed text-zinc-400">
+          One-time on this MacBook: create a GitHub token with the <span className="text-zinc-200">public_repo</span> scope,
+          paste it here, then clips you save go to the site. Your iPhone reads them automatically.
+        </p>
+        {connected ? (
+          <p className="text-xs text-emerald-300">Connected. New clips will show up on your iPhone after a refresh.</p>
+        ) : (
+          <form
+            className="space-y-2"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setSavingToken(true);
+              setStatus("");
+              try {
+                const login = await testGithubToken(token.trim());
+                setGithubToken(token.trim());
+                setConnected(true);
+                setToken("");
+                onTokenSaved?.();
+                setStatus(`Connected as ${login}. Publishing your board…`);
+                await publishBoard();
+                setStatus(`Connected as ${login}. Board published.`);
+              } catch (error) {
+                setStatus(error.message || "Token did not work. Use a classic token with public_repo.");
+              } finally {
+                setSavingToken(false);
+              }
+            }}
+          >
+            <input
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="ghp_…"
+              className="w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+            />
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="https://github.com/settings/tokens/new?description=Soundboard%20iPhone%20sync&scopes=public_repo"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-indigo-200"
+              >
+                Create token
+              </a>
+              <button
+                type="submit"
+                disabled={savingToken || !token.trim()}
+                className="rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                {savingToken ? "Connecting…" : "Save and publish"}
+              </button>
+            </div>
+          </form>
+        )}
+        {connected ? (
+          <button
+            type="button"
+            onClick={() => {
+              setGithubToken("");
+              setConnected(false);
+              onTokenSaved?.();
+              setStatus("Disconnected. iPhone will keep the last published board.");
+            }}
+            className="text-xs text-zinc-500"
+          >
+            Disconnect
+          </button>
+        ) : null}
       </section>
 
       <section className="space-y-3 rounded-3xl border border-white/10 bg-zinc-900/50 p-4">

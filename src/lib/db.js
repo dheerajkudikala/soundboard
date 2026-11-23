@@ -163,8 +163,8 @@ export async function replaceBoard({ friends, clips }) {
     if (friends?.length) await db.friends.bulkAdd(friends);
     for (const item of clips || []) {
       const { blob, ...clip } = item;
-      await db.clips.add(clip);
-      if (blob) await db.audio.add({ id: clip.id, blob });
+      await db.clips.put(clip);
+      if (blob) await db.audio.put({ id: clip.id, blob });
     }
   });
 }

@@ -13,7 +13,6 @@ export default defineConfig({
         "favicon.svg",
         "icons/icon-192.png",
         "icons/icon-512.png",
-        "sounds/manifest.json",
       ],
       manifest: {
         name: "Soundboard",
@@ -47,10 +46,21 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,json,wav,mp3,m4a,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
+        globIgnores: ["**/sounds/**"],
         navigateFallback: "index.html",
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.includes("/sounds/") || url.hostname === "raw.githubusercontent.com",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "soundboard-clips",
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 250, maxAgeSeconds: 60 * 60 * 24 * 14 },
+            },
+          },
           {
             urlPattern: ({ url }) =>
               url.hostname.includes("huggingface.co") ||
