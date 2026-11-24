@@ -10,7 +10,7 @@ import {
   updateClip,
 } from "../lib/db";
 import { importBundledManifest } from "../lib/boardZip";
-import { pullPublishedBoard, schedulePublish } from "../lib/cloudSync";
+import { POLL_MS, fillMissingAudio, pullPublishedBoard, schedulePublish } from "../lib/cloudSync";
 
 export function useBoard() {
   const [friends, setFriends] = useState([]);
@@ -24,6 +24,7 @@ export function useBoard() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const phone =
       typeof window !== "undefined" &&
       !window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)").matches;
@@ -31,11 +32,13 @@ export function useBoard() {
     async function load() {
       await seedIfEmpty();
       try {
-        const got = await pullPublishedBoard();
+        const got = await pullPublishedBoard({ prune: phone });
         if (!got) await importBundledManifest();
       } catch {
         await importBundledManifest();
       }
+      await fillMissingAudio();
+      if (cancelled) return;
       await refresh();
       setReady(true);
       if (!phone) schedulePublish();
@@ -45,16 +48,19 @@ export function useBoard() {
 
     const onVisible = () => {
       if (document.hidden) return;
-      pullPublishedBoard()
+      pullPublishedBoard({ prune: phone })
         .then((got) => got && refresh())
         .catch(() => {});
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
-    const poll = window.setInterval(onVisible, 8000);
+    window.addEventListener("online", onVisible);
+    const poll = window.setInterval(onVisible, POLL_MS);
     return () => {
+      cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onVisible);
       window.clearInterval(poll);
     };
   }, [refresh]);

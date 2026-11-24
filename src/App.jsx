@@ -7,6 +7,7 @@ import ClipEditor from "./components/ClipEditor.jsx";
 import DeleteClipModal from "./components/DeleteClipModal.jsx";
 import NameModal from "./components/NameModal.jsx";
 import Soundboard from "./components/Soundboard.jsx";
+import SyncBar from "./components/SyncBar.jsx";
 import { useBoard } from "./hooks/useBoard.js";
 import { useDesktop } from "./hooks/useDesktop.js";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
@@ -56,9 +57,10 @@ export default function App() {
         <div className="flex items-center justify-between gap-3">
           <div>
             {desktop ? (
-              <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-300">Offline PWA</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-300">Live board</p>
             ) : null}
             <h1 className={`font-semibold tracking-tight ${desktop ? "text-lg" : "text-2xl"}`}>Soundboard</h1>
+            <SyncBar />
           </div>
           <button
             type="button"
@@ -115,7 +117,11 @@ export default function App() {
             friends={board.friends}
             onSaved={async () => {
               await board.refresh();
-              await publishBoard();
+              try {
+                await publishBoard();
+              } catch {
+                /* SyncBar shows the error */
+              }
             }}
             onCreateFriend={board.addFriend}
           />
@@ -186,7 +192,11 @@ export default function App() {
           onClose={() => setEditorClip(null)}
           onSaved={async () => {
             await board.refresh();
-            await publishBoard();
+            try {
+              await publishBoard();
+            } catch {
+              /* SyncBar shows the error */
+            }
           }}
         />
       ) : null}

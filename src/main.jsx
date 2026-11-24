@@ -9,6 +9,11 @@ registerSW({
   onNeedRefresh(update) {
     update?.(true);
   },
+  onRegisteredSW(_url, registration) {
+    if (!registration) return;
+    window.setInterval(() => registration.update(), 20_000);
+    registration.update();
+  },
 });
 
 createRoot(document.getElementById("root")).render(

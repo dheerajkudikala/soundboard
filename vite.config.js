@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: false,
       includeAssets: [
         "apple-touch-icon.png",
         "favicon.svg",
@@ -46,6 +47,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
         globIgnores: ["**/sounds/**"],
         navigateFallback: "index.html",
@@ -53,9 +57,15 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
+              url.hostname === "rentry.co" ||
+              url.hostname === "rentry.org" ||
+              url.pathname.includes("/sounds/live/"),
+            handler: "NetworkOnly",
+          },
+          {
+            urlPattern: ({ url }) =>
               url.pathname.includes("/sounds/") ||
-              url.hostname === "raw.githubusercontent.com" ||
-              url.hostname === "rentry.co",
+              url.hostname === "raw.githubusercontent.com",
             handler: "NetworkFirst",
             options: {
               cacheName: "soundboard-clips",
