@@ -9,6 +9,7 @@ import {
   seedIfEmpty,
   updateClip,
 } from "../lib/db";
+import { getDbUrl, pullBoard, subscribeBoard } from "../lib/cloudDb";
 import { pullSitePack } from "../lib/sitePack";
 import { queuePublish } from "../lib/publish";
 
@@ -36,37 +37,45 @@ export function useBoard() {
       typeof window !== "undefined" &&
       !window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)").matches;
 
+    let stopWatch = () => {};
+
     async function load() {
       await seedIfEmpty();
-      await pullSitePack({ overwriteMeta: phone });
+      const dbUrl = await getDbUrl();
+      if (dbUrl) {
+        await pullBoard({ overwriteMeta: phone }).catch(() => false);
+      } else {
+        await pullSitePack({ overwriteMeta: phone });
+      }
       if (cancelled) return;
       await refresh();
       setReady(true);
+      if (phone && dbUrl) {
+        stopWatch = subscribeBoard(() => {
+          pullBoard({ overwriteMeta: true })
+            .then((changed) => changed && refresh())
+            .catch(() => {});
+        });
+      }
     }
 
     load();
 
     const onVisible = () => {
       if (document.hidden || !phone) return;
-      pullSitePack({ overwriteMeta: true })
-        .then((changed) => changed && refresh())
-        .catch(() => {});
+      getDbUrl().then((dbUrl) =>
+        (dbUrl ? pullBoard({ overwriteMeta: true }) : pullSitePack({ overwriteMeta: true }))
+          .then((changed) => changed && refresh())
+          .catch(() => {})
+      );
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
-    const tick = phone
-      ? window.setInterval(() => {
-          if (document.hidden) return;
-          pullSitePack({ overwriteMeta: true })
-            .then((changed) => changed && refresh())
-            .catch(() => {});
-        }, 20000)
-      : 0;
     return () => {
       cancelled = true;
+      stopWatch();
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      if (tick) window.clearInterval(tick);
     };
   }, [refresh]);
 

@@ -128,10 +128,17 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
-        globIgnores: ["**/sounds/**"],
+        globIgnores: ["**/sounds/**", "**/db.json"],
         navigateFallback: "index.html",
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.endsWith("/db.json") ||
+              url.hostname.endsWith("firebaseio.com") ||
+              url.hostname.endsWith("firebasedatabase.app"),
+            handler: "NetworkOnly",
+          },
           {
             urlPattern: ({ url }) => url.pathname.includes("/sounds/"),
             handler: "NetworkFirst",
