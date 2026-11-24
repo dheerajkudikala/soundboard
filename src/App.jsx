@@ -7,13 +7,11 @@ import ClipEditor from "./components/ClipEditor.jsx";
 import DeleteClipModal from "./components/DeleteClipModal.jsx";
 import NameModal from "./components/NameModal.jsx";
 import Soundboard from "./components/Soundboard.jsx";
-import SyncBar from "./components/SyncBar.jsx";
 import { useBoard } from "./hooks/useBoard.js";
 import { useDesktop } from "./hooks/useDesktop.js";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { getClipBlob } from "./lib/db.js";
 import { playClip, stopAll } from "./lib/audio.js";
-import { publishBoard, schedulePublish } from "./lib/cloudSync.js";
 
 export default function App() {
   const board = useBoard();
@@ -56,11 +54,7 @@ export default function App() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950/85 px-4 pb-3 pt-3 backdrop-blur-md">
         <div className="flex items-center justify-between gap-3">
           <div>
-            {desktop ? (
-              <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-300">Live board</p>
-            ) : null}
             <h1 className={`font-semibold tracking-tight ${desktop ? "text-lg" : "text-2xl"}`}>Soundboard</h1>
-            <SyncBar />
           </div>
           <button
             type="button"
@@ -115,14 +109,7 @@ export default function App() {
         {desktop && tab === "clip" && (
           <Clipper
             friends={board.friends}
-            onSaved={async () => {
-              await board.refresh();
-              try {
-                await publishBoard();
-              } catch {
-                /* SyncBar shows the error */
-              }
-            }}
+            onSaved={() => board.refresh()}
             onCreateFriend={board.addFriend}
           />
         )}
@@ -135,10 +122,7 @@ export default function App() {
             onDeleteFriend={(id) => {
               if (window.confirm("Delete this friend and their clips?")) board.deleteFriend(id);
             }}
-            onImported={() => {
-              board.refresh();
-              schedulePublish();
-            }}
+            onImported={() => board.refresh()}
           />
         )}
       </main>
@@ -190,14 +174,7 @@ export default function App() {
           clip={editorClip}
           friends={board.friends}
           onClose={() => setEditorClip(null)}
-          onSaved={async () => {
-            await board.refresh();
-            try {
-              await publishBoard();
-            } catch {
-              /* SyncBar shows the error */
-            }
-          }}
+          onSaved={() => board.refresh()}
         />
       ) : null}
 

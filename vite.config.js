@@ -56,21 +56,11 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ url }) =>
-              url.hostname === "rentry.co" ||
-              url.hostname === "rentry.org" ||
-              url.pathname.includes("/sounds/live/"),
-            handler: "NetworkOnly",
-          },
-          {
-            urlPattern: ({ url }) =>
-              url.pathname.includes("/sounds/") ||
-              url.hostname === "raw.githubusercontent.com",
-            handler: "NetworkFirst",
+            urlPattern: ({ url }) => url.pathname.includes("/sounds/"),
+            handler: "StaleWhileRevalidate",
             options: {
               cacheName: "soundboard-clips",
-              networkTimeoutSeconds: 4,
-              expiration: { maxEntries: 250, maxAgeSeconds: 60 * 60 * 24 * 14 },
+              expiration: { maxEntries: 250, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {

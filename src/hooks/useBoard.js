@@ -9,8 +9,7 @@ import {
   seedIfEmpty,
   updateClip,
 } from "../lib/db";
-import { importBundledManifest } from "../lib/boardZip";
-import { POLL_MS, fillMissingAudio, pullPublishedBoard, schedulePublish } from "../lib/cloudSync";
+import { pullSitePack } from "../lib/sitePack";
 
 export function useBoard() {
   const [friends, setFriends] = useState([]);
@@ -18,9 +17,9 @@ export function useBoard() {
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [f, c] = await Promise.all([listFriends(), listClips()]);
-    setFriends(f);
-    setClips(c);
+    const [nextFriends, nextClips] = await Promise.all([listFriends(), listClips()]);
+    setFriends(nextFriends);
+    setClips(nextClips);
   }, []);
 
   useEffect(() => {
@@ -31,41 +30,26 @@ export function useBoard() {
 
     async function load() {
       await seedIfEmpty();
-      await importBundledManifest();
-      try {
-        await pullPublishedBoard({ prune: phone });
-      } catch {
-        /* bundled clips still load */
-      }
-      await fillMissingAudio();
+      await pullSitePack({ overwriteMeta: phone });
       if (cancelled) return;
       await refresh();
       setReady(true);
-      if (!phone) schedulePublish();
     }
 
     load();
 
     const onVisible = () => {
       if (document.hidden) return;
-      Promise.all([
-        pullPublishedBoard({ prune: phone }).catch(() => false),
-        importBundledManifest(),
-        fillMissingAudio(),
-      ])
-        .then(() => refresh())
+      pullSitePack({ overwriteMeta: phone })
+        .then((changed) => changed && refresh())
         .catch(() => {});
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
-    window.addEventListener("online", onVisible);
-    const poll = window.setInterval(onVisible, POLL_MS);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      window.removeEventListener("online", onVisible);
-      window.clearInterval(poll);
     };
   }, [refresh]);
 
@@ -77,33 +61,27 @@ export function useBoard() {
     addFriend: async (name) => {
       const friend = await addFriend(name);
       await refresh();
-      schedulePublish();
       return friend;
     },
     renameFriend: async (id, name) => {
       await renameFriend(id, name);
       await refresh();
-      schedulePublish();
     },
     deleteFriend: async (id) => {
       await deleteFriend(id);
       await refresh();
-      schedulePublish();
     },
     renameClip: async (id, title) => {
       await updateClip(id, { title });
       await refresh();
-      schedulePublish();
     },
     moveClip: async (id, friendId) => {
       await updateClip(id, { friendId });
       await refresh();
-      schedulePublish();
     },
     deleteClip: async (id) => {
       await deleteClip(id);
       await refresh();
-      schedulePublish();
     },
   };
 }

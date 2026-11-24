@@ -36,7 +36,6 @@ export function useInstallPrompt() {
         fn = registerSW({
           immediate: true,
           onNeedRefresh() {
-            fn(true);
             if (mounted) setNeedRefresh(true);
           },
         });
