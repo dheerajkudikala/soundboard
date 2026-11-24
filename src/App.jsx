@@ -12,7 +12,7 @@ import { useDesktop } from "./hooks/useDesktop.js";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { getClipBlob } from "./lib/db.js";
 import { playClip, stopAll } from "./lib/audio.js";
-import { schedulePublish } from "./lib/cloudSync.js";
+import { publishBoard, schedulePublish } from "./lib/cloudSync.js";
 
 export default function App() {
   const board = useBoard();
@@ -113,9 +113,9 @@ export default function App() {
         {desktop && tab === "clip" && (
           <Clipper
             friends={board.friends}
-            onSaved={() => {
-              board.refresh();
-              schedulePublish();
+            onSaved={async () => {
+              await board.refresh();
+              await publishBoard();
             }}
             onCreateFriend={board.addFriend}
           />
@@ -184,9 +184,9 @@ export default function App() {
           clip={editorClip}
           friends={board.friends}
           onClose={() => setEditorClip(null)}
-          onSaved={() => {
-            board.refresh();
-            schedulePublish();
+          onSaved={async () => {
+            await board.refresh();
+            await publishBoard();
           }}
         />
       ) : null}

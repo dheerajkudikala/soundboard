@@ -155,6 +155,30 @@ export async function getClipBlob(id) {
   return row?.blob || null;
 }
 
+export async function mergeBoard({ friends, clips, keepIds }) {
+  await db.transaction("rw", db.friends, db.clips, db.audio, async () => {
+    for (const friend of friends || []) {
+      if (friend?.id) await db.friends.put(friend);
+    }
+    for (const item of clips || []) {
+      const { blob, ...clip } = item;
+      if (!clip.id) continue;
+      const current = await db.clips.get(clip.id);
+      await db.clips.put({ ...(current || {}), ...clip, id: clip.id });
+      if (blob) await db.audio.put({ id: clip.id, blob });
+    }
+    if (keepIds) {
+      const local = await db.clips.toArray();
+      for (const clip of local) {
+        if (!keepIds.has(clip.id)) {
+          await db.clips.delete(clip.id);
+          await db.audio.delete(clip.id);
+        }
+      }
+    }
+  });
+}
+
 export async function replaceBoard({ friends, clips }) {
   await db.transaction("rw", db.friends, db.clips, db.audio, async () => {
     await db.friends.clear();

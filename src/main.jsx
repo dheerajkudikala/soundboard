@@ -4,7 +4,12 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App.jsx";
 import "./index.css";
 
-registerSW({ immediate: true });
+registerSW({
+  immediate: true,
+  onNeedRefresh(update) {
+    update?.(true);
+  },
+});
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -51,7 +51,7 @@ export function useBoard() {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
-    const poll = window.setInterval(onVisible, 20000);
+    const poll = window.setInterval(onVisible, 8000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);

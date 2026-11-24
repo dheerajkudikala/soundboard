@@ -32,9 +32,11 @@ export function useInstallPrompt() {
     let mounted = true;
     import("virtual:pwa-register")
       .then(({ registerSW }) => {
-        const fn = registerSW({
+        let fn = () => {};
+        fn = registerSW({
           immediate: true,
           onNeedRefresh() {
+            fn(true);
             if (mounted) setNeedRefresh(true);
           },
         });
