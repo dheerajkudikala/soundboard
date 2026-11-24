@@ -31,11 +31,11 @@ export function useBoard() {
 
     async function load() {
       await seedIfEmpty();
+      await importBundledManifest();
       try {
-        const got = await pullPublishedBoard({ prune: phone });
-        if (!got) await importBundledManifest();
+        await pullPublishedBoard({ prune: phone });
       } catch {
-        await importBundledManifest();
+        /* bundled clips still load */
       }
       await fillMissingAudio();
       if (cancelled) return;
@@ -48,8 +48,12 @@ export function useBoard() {
 
     const onVisible = () => {
       if (document.hidden) return;
-      pullPublishedBoard({ prune: phone })
-        .then((got) => got && refresh())
+      Promise.all([
+        pullPublishedBoard({ prune: phone }).catch(() => false),
+        importBundledManifest(),
+        fillMissingAudio(),
+      ])
+        .then(() => refresh())
         .catch(() => {});
     };
     document.addEventListener("visibilitychange", onVisible);

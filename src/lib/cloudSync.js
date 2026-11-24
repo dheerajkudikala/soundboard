@@ -67,23 +67,57 @@ async function compactWav(blob) {
   }
 }
 
+function unescapeHtml(value) {
+  return String(value || "")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function asBoard(parsed) {
+  if (parsed?.friends || parsed?.clips || parsed?.v) return parsed;
+  return null;
+}
+
 function parseRemote(text) {
   const trimmed = String(text || "").trim();
   if (!trimmed) return null;
-  const parsed = JSON.parse(trimmed);
-  if (parsed?.status && String(parsed.status) !== "200") {
-    if (typeof parsed.content === "string" && parsed.content.trim().startsWith("{")) {
-      return JSON.parse(parsed.content);
+  if (trimmed.startsWith("{")) {
+    const parsed = JSON.parse(trimmed);
+    if (parsed?.status && String(parsed.status) !== "200") {
+      if (typeof parsed.content === "string" && parsed.content.trim().startsWith("{")) {
+        return asBoard(JSON.parse(parsed.content));
+      }
+      return null;
     }
+    return asBoard(parsed) || (typeof parsed.content === "string" ? asBoard(JSON.parse(parsed.content)) : null);
+  }
+  return boardFromHtml(trimmed);
+}
+
+function boardFromHtml(html) {
+  const blocks = [...String(html).matchAll(/<p>([\s\S]*?)<\/p>/gi)];
+  for (const block of blocks) {
+    const candidate = unescapeHtml(block[1]).trim();
+    if (!candidate.startsWith("{")) continue;
+    try {
+      const parsed = asBoard(JSON.parse(candidate));
+      if (parsed) return parsed;
+    } catch {
+      /* next block */
+    }
+  }
+  const start = unescapeHtml(html).indexOf('{"v":');
+  if (start < 0) return null;
+  const slice = unescapeHtml(html).slice(start);
+  const end = slice.indexOf("</p>");
+  try {
+    return asBoard(JSON.parse(end >= 0 ? slice.slice(0, end) : slice));
+  } catch {
     return null;
   }
-  if (parsed?.friends || parsed?.clips || parsed?.v) return parsed;
-  if (typeof parsed.content === "string") {
-    const content = parsed.content.trim();
-    if (content.startsWith("{")) return JSON.parse(content);
-    return { _raw: content };
-  }
-  return null;
 }
 
 async function fetchText(url) {
@@ -94,21 +128,26 @@ async function fetchText(url) {
 
 async function readPaste(id) {
   const urls = [
+    `https://rentry.co/${id}`,
+    `https://rentry.org/${id}`,
     `https://rentry.co/${id}/raw`,
     `https://rentry.co/api/raw/${id}`,
-    `https://rentry.org/${id}/raw`,
   ];
   let lastError = null;
   for (const url of urls) {
     try {
       const text = await fetchText(url);
       try {
-        const parsed = parseRemote(text);
-        if (parsed) return parsed;
+        const parsed = parseRemote(text) || boardFromHtml(text);
+        if (parsed?.clips || parsed?.friends || parsed?.v) return parsed;
+        if (parsed?._raw) return parsed;
       } catch {
-        /* raw audio payload */
+        /* keep looking */
       }
-      if (text) return { _raw: text };
+      const trimmed = String(text || "").trim();
+      if (trimmed.startsWith("data:") || /^[A-Za-z0-9+/=]+$/.test(trimmed.slice(0, 80))) {
+        return { _raw: trimmed };
+      }
     } catch (error) {
       lastError = error;
     }
@@ -242,7 +281,8 @@ export async function publishBoard() {
       };
       const localBlob = await getClipBlob(clip.id);
       const stamp = localBlob ? `${localBlob.size}:${Math.round((clip.duration || 0) * 1000)}` : "";
-      if (files.has(clip.id) && !prior.parts) {
+      const bundledUnchanged = files.has(clip.id) && (!prior.stamp || prior.stamp === stamp);
+      if (bundledUnchanged && !prior.parts && !prior.audio) {
         packed.push({ ...row, stamp });
         continue;
       }
@@ -284,7 +324,7 @@ export async function pullPublishedBoard({ prune = false } = {}) {
   emit({ status: sync.status === "error" ? "error" : "syncing", message: "Checking live board…" });
   try {
     const remote = await readPaste(PASTE_ID);
-    if (!remote || (!remote.clips && !remote.friends)) {
+    if (!remote?.clips && !remote?.friends) {
       emit({ status: "error", message: "Live board is empty or blocked" });
       return false;
     }

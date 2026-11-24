@@ -50,25 +50,11 @@ export async function importBoardZip(file) {
   await replaceBoard({ friends, clips });
 }
 
-const BUNDLE_ID = "board-2026-11-23";
-
 export async function importBundledManifest() {
   try {
-    const res = await fetch("./sounds/manifest.json");
-    if (!res.ok) return;
+    const res = await fetch(`./sounds/manifest.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return false;
     const manifest = await res.json();
-    const already = await db.meta.get("bundled");
-    if (already?.value === BUNDLE_ID) return;
-    if (!manifest.clips?.length && !manifest.friends?.length) {
-      await db.meta.put({ key: "bundled", value: BUNDLE_ID });
-      return;
-    }
-    const localClips = await db.clips.count();
-    if (localClips > 0) {
-      await db.meta.put({ key: "bundled", value: BUNDLE_ID });
-      return;
-    }
-
     const friends = (manifest.friends || []).map((f, i) => ({
       id: f.id || uid(),
       name: f.name,
@@ -77,9 +63,17 @@ export async function importBundledManifest() {
     }));
     const clips = [];
     for (const clip of manifest.clips || []) {
-      const audioRes = await fetch(`./sounds/${clip.file}`);
-      if (!audioRes.ok) continue;
-      const blob = await audioRes.blob();
+      const existing = await db.clips.get(clip.id);
+      const hasAudio = Boolean(await db.audio.get(clip.id));
+      if (existing && hasAudio) {
+        clips.push({ ...existing, ...clip, blob: null });
+        continue;
+      }
+      const audioRes = await fetch(`./sounds/${clip.file}?t=${Date.now()}`, { cache: "no-store" });
+      if (!audioRes.ok) {
+        if (existing) clips.push({ ...existing, ...clip, blob: null });
+        continue;
+      }
       clips.push({
         id: clip.id || uid(),
         title: clip.title,
@@ -89,15 +83,27 @@ export async function importBundledManifest() {
         volume: clip.volume ?? 1,
         playbackRate: clip.playbackRate ?? 1,
         preservePitch: clip.preservePitch !== false,
-        blob,
+        blob: await audioRes.blob(),
       });
     }
-    if ((friends.length || clips.length) && (await db.clips.count()) === 0) {
-      await replaceBoard({ friends, clips });
+    if (friends.length || clips.length) {
+      await db.transaction("rw", db.friends, db.clips, db.audio, async () => {
+        for (const friend of friends) {
+          if (friend.id) await db.friends.put(friend);
+        }
+        for (const item of clips) {
+          const { blob, ...clip } = item;
+          const current = await db.clips.get(clip.id);
+          await db.clips.put({ ...(current || {}), ...clip, id: clip.id });
+          if (blob) await db.audio.put({ id: clip.id, blob });
+        }
+      });
     }
-    await db.meta.put({ key: "bundled", value: BUNDLE_ID });
+    await db.meta.put({ key: "bundled", value: `board-${manifest.clips?.length || 0}` });
+    return Boolean(clips.length);
   } catch (error) {
     console.warn("Bundled sounds skipped", error);
+    return false;
   }
 }
 
