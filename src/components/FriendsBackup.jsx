@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Download, Trash2, Upload } from "lucide-react";
 import { downloadBlob, exportBoardZip, importBoardZip } from "../lib/boardZip";
+import PhoneSync from "./PhoneSync.jsx";
 
 export default function FriendsBackup({
   friends,
@@ -65,8 +66,10 @@ export default function FriendsBackup({
         </button>
       </section>
 
+      <PhoneSync />
+
       <section className="space-y-3 rounded-3xl border border-white/10 bg-zinc-900/50 p-4">
-        <h2 className="text-sm font-semibold text-white">GitHub Sync / Backup</h2>
+        <h2 className="text-sm font-semibold text-white">Backup zip</h2>
         <p className="text-xs leading-relaxed text-zinc-400">
           Export a zip of <code className="text-zinc-200">manifest.json</code> plus trimmed wavs. Import it on another phone,
           or drop clips into <code className="text-zinc-200">public/sounds</code> and ship them with GitHub Pages.

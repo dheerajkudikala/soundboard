@@ -12,6 +12,7 @@ import { useDesktop } from "./hooks/useDesktop.js";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { getClipBlob } from "./lib/db.js";
 import { playClip, stopAll } from "./lib/audio.js";
+import { getPublishStatus, onPublishStatus } from "./lib/publish.js";
 
 export default function App() {
   const board = useBoard();
@@ -22,7 +23,14 @@ export default function App() {
   const [renameClip, setRenameClip] = useState(null);
   const [editorClip, setEditorClip] = useState(null);
   const [deleteClip, setDeleteClip] = useState(null);
+  const [publishState, setPublishState] = useState({ state: "idle" });
   const friendAddedRef = useRef(null);
+
+  useEffect(() => {
+    if (!desktop) return undefined;
+    getPublishStatus().then(setPublishState);
+    return onPublishStatus(setPublishState);
+  }, [desktop]);
 
   useEffect(() => {
     const onKey = (event) => {
@@ -55,6 +63,15 @@ export default function App() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className={`font-semibold tracking-tight ${desktop ? "text-lg" : "text-2xl"}`}>Soundboard</h1>
+            {desktop && publishState.state === "saving" ? (
+              <p className="text-[11px] text-zinc-500">Saving to phones…</p>
+            ) : null}
+            {desktop && publishState.state === "need-token" ? (
+              <p className="text-[11px] text-amber-200/90">Friends tab: paste a GitHub token once so the phone gets this clip.</p>
+            ) : null}
+            {desktop && publishState.state === "error" ? (
+              <p className="text-[11px] text-rose-300/90">{publishState.message}</p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -109,7 +126,10 @@ export default function App() {
         {desktop && tab === "clip" && (
           <Clipper
             friends={board.friends}
-            onSaved={() => board.refresh()}
+            onSaved={() => {
+              board.refresh();
+              board.publish();
+            }}
             onCreateFriend={board.addFriend}
           />
         )}
@@ -122,7 +142,10 @@ export default function App() {
             onDeleteFriend={(id) => {
               if (window.confirm("Delete this friend and their clips?")) board.deleteFriend(id);
             }}
-            onImported={() => board.refresh()}
+            onImported={() => {
+              board.refresh();
+              board.publish();
+            }}
           />
         )}
       </main>
@@ -174,7 +197,10 @@ export default function App() {
           clip={editorClip}
           friends={board.friends}
           onClose={() => setEditorClip(null)}
-          onSaved={() => board.refresh()}
+          onSaved={() => {
+            board.refresh();
+            board.publish();
+          }}
         />
       ) : null}
 

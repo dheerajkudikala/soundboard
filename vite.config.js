@@ -1,10 +1,87 @@
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+function collectBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+function boardPublishPlugin() {
+  let deployTimer = 0;
+  return {
+    name: "board-publish",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (req.url?.split("?")[0] !== "/__board-publish") return next();
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+        try {
+          const body = JSON.parse((await collectBody(req)).toString("utf8"));
+          const dir = path.resolve("public/sounds");
+          await fs.mkdir(dir, { recursive: true });
+          const keep = new Set(["manifest.json"]);
+          const clips = [];
+          for (const clip of body.clips || []) {
+            if (!clip?.id) continue;
+            const name = `${clip.id}.wav`;
+            keep.add(name);
+            clips.push({
+              id: clip.id,
+              title: clip.title,
+              friendId: clip.friendId,
+              duration: clip.duration || 0,
+              createdAt: clip.createdAt,
+              file: name,
+              volume: clip.volume ?? 1,
+              playbackRate: clip.playbackRate ?? 1,
+              preservePitch: clip.preservePitch !== false,
+            });
+            if (clip.audio) {
+              await fs.writeFile(path.join(dir, name), Buffer.from(clip.audio, "base64"));
+            }
+          }
+          await fs.writeFile(
+            path.join(dir, "manifest.json"),
+            `${JSON.stringify({ version: 2, friends: body.friends || [], clips }, null, 2)}\n`
+          );
+          for (const name of await fs.readdir(dir)) {
+            if (name.endsWith(".wav") && !keep.has(name)) await fs.unlink(path.join(dir, name));
+          }
+          res.statusCode = 204;
+          res.end();
+          clearTimeout(deployTimer);
+          deployTimer = setTimeout(() => {
+            spawn("npm", ["run", "deploy"], {
+              cwd: process.cwd(),
+              stdio: "ignore",
+              detached: true,
+              shell: true,
+            }).unref();
+          }, 4000);
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(error.message || "publish failed");
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: "./",
   plugins: [
+    boardPublishPlugin(),
     react(),
     VitePWA({
       registerType: "autoUpdate",
@@ -57,9 +134,10 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.includes("/sounds/"),
-            handler: "StaleWhileRevalidate",
+            handler: "NetworkFirst",
             options: {
               cacheName: "soundboard-clips",
+              networkTimeoutSeconds: 4,
               expiration: { maxEntries: 250, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
