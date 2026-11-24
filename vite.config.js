@@ -124,12 +124,14 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cacheId: "soundboard-live-2",
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
         globIgnores: ["**/sounds/**", "**/db.json"],
         navigateFallback: "index.html",
+        navigateFallbackDenylist: [/^\/soundboard\/db\.json/, /firebaseio\.com/, /firebasedatabase\.app/],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
           {

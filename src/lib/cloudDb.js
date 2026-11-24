@@ -1,5 +1,13 @@
 import { db, getClipBlob, listClips, listFriends, mergeBoard, uid } from "./db";
 
+export const DB_ROOT = "https://soundboard-1c917-default-rtdb.firebaseio.com/sb";
+
+export function isPhoneDevice() {
+  if (typeof navigator === "undefined") return false;
+  if (/iPhone|iPod|Android/i.test(navigator.userAgent)) return true;
+  return navigator.maxTouchPoints > 1 && !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
 function fingerprintBytes(bytes) {
   let hash = 2166136261;
   const step = Math.max(1, Math.floor(bytes.length / 4096));
@@ -31,45 +39,20 @@ function base64ToBlob(b64) {
   return new Blob([bytes], { type: "audio/wav" });
 }
 
-export function normalizeDbUrl(value) {
-  const trimmed = String(value || "").trim();
-  if (!trimmed) return "";
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  const url = new URL(withProtocol);
-  if (!url.hostname.endsWith("firebaseio.com") && !url.hostname.endsWith("firebasedatabase.app")) {
-    throw new Error("Use the Firebase Realtime Database URL (firebaseio.com).");
-  }
-  const path = url.pathname.replace(/\/+$/, "").replace(/\.json$/, "");
-  const prefix = !path || path === "" ? "/sb" : path;
-  return `${url.origin}${prefix === "/" ? "/sb" : prefix}`;
+function asClipList(clips) {
+  if (Array.isArray(clips)) return clips.filter(Boolean);
+  if (clips && typeof clips === "object") return Object.values(clips);
+  return [];
 }
 
-export async function getDbUrl() {
-  const local = await db.meta.get("dbUrl");
-  if (local?.value) return String(local.value);
-  try {
-    const res = await fetch("./db.json", { cache: "no-store" });
-    if (!res.ok) return "";
-    const cfg = await res.json();
-    return cfg.url ? normalizeDbUrl(cfg.url) : "";
-  } catch {
-    return "";
-  }
-}
-
-export async function setDbUrl(value) {
-  const url = value ? normalizeDbUrl(value) : "";
-  if (!url) await db.meta.delete("dbUrl");
-  else await db.meta.put({ key: "dbUrl", value: url });
-  return url;
-}
-
-async function rest(url, { method = "GET", body } = {}) {
-  const res = await fetch(url, {
+async function rest(path, { method = "GET", body } = {}) {
+  const res = await fetch(`${DB_ROOT}${path}`, {
     method,
+    mode: "cors",
+    credentials: "omit",
+    cache: "no-store",
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    cache: "no-store",
   });
   if (res.status === 204 || res.status === 404) return null;
   const text = await res.text();
@@ -105,31 +88,42 @@ async function buildLocal() {
   return { friends, clips: meta, audio };
 }
 
-export async function pushBoard() {
-  const root = await getDbUrl();
-  if (!root) return { skipped: "need-db" };
-  const pack = await buildLocal();
-  const stamp = `${JSON.stringify(pack.friends)}|${pack.clips.map((c) => `${c.id}:${c.hash}:${c.title}:${c.friendId}`).join(",")}`;
-  const last = await db.meta.get("dbStamp");
-  if (last?.value === stamp) return { skipped: "unchanged", clips: pack.clips.length };
+export async function getDbUrl() {
+  return DB_ROOT;
+}
 
-  const remote = (await rest(`${root}/board.json`)) || { clips: [] };
-  const remoteHashes = new Map((remote.clips || []).map((clip) => [clip.id, clip.hash]));
+export async function setDbUrl() {
+  return DB_ROOT;
+}
+
+export async function pushBoard() {
+  if (isPhoneDevice()) return { skipped: "phone" };
+  const pack = await buildLocal();
+  const stamp = pack.clips.map((c) => `${c.id}:${c.hash}:${c.title}:${c.friendId}`).join(",");
+  const remote = (await rest("/board.json")) || {};
+  const remoteClips = asClipList(remote.clips);
+  if (remote.at && (await db.meta.get("dbStamp"))?.value === stamp) {
+    return { skipped: "unchanged", clips: pack.clips.length };
+  }
+
+  const remoteHashes = new Map(remoteClips.map((clip) => [clip.id, clip.hash]));
   const keep = new Set(pack.clips.map((clip) => clip.id));
+
+  await rest("/board.json", {
+    method: "PUT",
+    body: { friends: pack.friends, clips: pack.clips, at: Date.now() },
+  });
 
   for (const item of pack.audio) {
     if (remoteHashes.get(item.id) === item.hash) continue;
-    await rest(`${root}/audio/${item.id}.json`, {
+    await rest(`/audio/${item.id}.json`, {
       method: "PUT",
       body: { h: item.hash, d: bytesToBase64(item.bytes) },
     });
   }
-  await rest(`${root}/board.json`, {
-    method: "PUT",
-    body: { friends: pack.friends, clips: pack.clips, at: Date.now() },
-  });
-  for (const clip of remote.clips || []) {
-    if (!keep.has(clip.id)) await rest(`${root}/audio/${clip.id}.json`, { method: "DELETE" });
+
+  for (const clip of remoteClips) {
+    if (!keep.has(clip.id)) await rest(`/audio/${clip.id}.json`, { method: "DELETE" });
   }
 
   await db.meta.put({ key: "dbStamp", value: stamp });
@@ -137,31 +131,32 @@ export async function pushBoard() {
 }
 
 export async function pullBoard({ overwriteMeta = false } = {}) {
-  const root = await getDbUrl();
-  if (!root) return false;
-  const board = await rest(`${root}/board.json`);
-  if (!board?.clips) return false;
+  const board = await rest("/board.json");
+  const clipsMeta = asClipList(board?.clips);
+  if (!board || !clipsMeta.length) return false;
 
-  const stamp = `${board.at || ""}:${(board.clips || []).map((c) => `${c.id}:${c.hash}:${c.title}`).join(",")}`;
+  const stamp = `${board.at || ""}:${clipsMeta.map((c) => `${c.id}:${c.hash}:${c.title}`).join(",")}`;
   const previous = await db.meta.get("dbPullStamp");
   const needed = [];
-  for (const clip of board.clips || []) {
-    if (!clip.id) continue;
+  for (const clip of clipsMeta) {
+    if (!clip?.id) continue;
     if (!(await db.audio.get(clip.id))) needed.push(clip);
-    else if (clip.hash) {
-      const known = await db.meta.get(`audioHash:${clip.id}`);
-      if (known?.value !== clip.hash) needed.push(clip);
+    else if (clip.hash && (await db.meta.get(`audioHash:${clip.id}`))?.value !== clip.hash) {
+      needed.push(clip);
     }
   }
   if (previous?.value === stamp && needed.length === 0 && !overwriteMeta) return false;
 
   const clips = [];
-  for (const clip of board.clips || []) {
-    if (!clip.id) continue;
+  for (const clip of clipsMeta) {
+    if (!clip?.id) continue;
     let blob = null;
     if (needed.some((item) => item.id === clip.id)) {
-      const row = await rest(`${root}/audio/${clip.id}.json`);
-      if (row?.d) blob = base64ToBlob(row.d);
+      const row = await rest(`/audio/${clip.id}.json`);
+      if (row?.d) {
+        blob = base64ToBlob(row.d);
+        if (clip.hash) await db.meta.put({ key: `audioHash:${clip.id}`, value: clip.hash });
+      }
     }
     clips.push({
       id: clip.id,
@@ -174,7 +169,6 @@ export async function pullBoard({ overwriteMeta = false } = {}) {
       preservePitch: clip.preservePitch !== false,
       blob,
     });
-    if (clip.hash) await db.meta.put({ key: `audioHash:${clip.id}`, value: clip.hash });
   }
 
   const friends = (board.friends || []).map((friend, i) => ({
@@ -187,7 +181,7 @@ export async function pullBoard({ overwriteMeta = false } = {}) {
   await mergeBoard({
     friends,
     clips,
-    keepIds: overwriteMeta && board.at ? new Set(clips.map((clip) => clip.id)) : undefined,
+    keepIds: overwriteMeta ? new Set(clips.map((clip) => clip.id)) : undefined,
   });
   await db.meta.put({ key: "dbPullStamp", value: stamp });
   return true;
@@ -196,30 +190,31 @@ export async function pullBoard({ overwriteMeta = false } = {}) {
 export function subscribeBoard(onChange) {
   let source = null;
   let stopped = false;
+  let timer = 0;
 
-  async function start() {
-    const root = await getDbUrl();
-    if (!root || stopped) return () => {};
+  const ping = () => {
+    if (!stopped) onChange();
+  };
+
+  function startStream() {
     try {
-      source = new EventSource(`${root}/board.json`);
-      const handle = () => {
-        onChange();
-      };
-      source.addEventListener("put", handle);
-      source.addEventListener("patch", handle);
+      source = new EventSource(`${DB_ROOT}/board.json`);
+      source.addEventListener("put", ping);
+      source.addEventListener("patch", ping);
       source.onerror = () => {
         source?.close();
         source = null;
-        if (!stopped) window.setTimeout(start, 4000);
       };
     } catch {
-      if (!stopped) window.setTimeout(start, 4000);
+      source = null;
     }
   }
 
-  start();
+  startStream();
+  timer = window.setInterval(ping, 4000);
   return () => {
     stopped = true;
     source?.close();
+    window.clearInterval(timer);
   };
 }

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { getDbUrl, pushBoard } from "./cloudDb";
+import { isPhoneDevice, pushBoard } from "./cloudDb";
 
 const listeners = new Set();
 let timer = 0;
@@ -27,21 +27,14 @@ export function onPublishStatus(fn) {
 }
 
 async function publishNow() {
-  const url = await getDbUrl();
-  if (!url) {
-    await setStatus({ state: "need-db", at: Date.now() });
-    return;
-  }
+  if (isPhoneDevice()) return;
   await setStatus({ state: "saving", at: Date.now() });
   const result = await pushBoard();
-  if (result?.skipped === "need-db") {
-    await setStatus({ state: "need-db", at: Date.now() });
-    return;
-  }
-  await setStatus({ state: "ok", at: Date.now(), clips: result.clips });
+  await setStatus({ state: "ok", at: Date.now(), clips: result.clips || 0 });
 }
 
 export function queuePublish() {
+  if (isPhoneDevice()) return;
   queued = true;
   window.clearTimeout(timer);
   timer = window.setTimeout(async () => {
@@ -63,5 +56,5 @@ export function queuePublish() {
     } finally {
       running = false;
     }
-  }, 700);
+  }, 400);
 }

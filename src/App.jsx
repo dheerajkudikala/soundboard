@@ -66,8 +66,8 @@ export default function App() {
             {desktop && publishState.state === "saving" ? (
               <p className="text-[11px] text-zinc-500">Saving to phones…</p>
             ) : null}
-            {desktop && publishState.state === "need-db" ? (
-              <p className="text-[11px] text-amber-200/90">Friends tab: paste the Firebase database URL so the phone updates live.</p>
+            {desktop && publishState.state === "ok" ? (
+              <p className="text-[11px] text-zinc-500">Live database · {publishState.clips || 0} clips</p>
             ) : null}
             {desktop && publishState.state === "error" ? (
               <p className="text-[11px] text-rose-300/90">{publishState.message}</p>

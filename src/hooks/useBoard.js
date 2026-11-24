@@ -9,7 +9,7 @@ import {
   seedIfEmpty,
   updateClip,
 } from "../lib/db";
-import { getDbUrl, pullBoard, subscribeBoard } from "../lib/cloudDb";
+import { isPhoneDevice, pullBoard, subscribeBoard } from "../lib/cloudDb";
 import { pullSitePack } from "../lib/sitePack";
 import { queuePublish } from "../lib/publish";
 
@@ -25,49 +25,43 @@ export function useBoard() {
   }, []);
 
   const publish = useCallback(() => {
-    const desktop =
-      typeof window !== "undefined" &&
-      window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)").matches;
-    if (desktop) queuePublish();
+    queuePublish();
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    const phone =
-      typeof window !== "undefined" &&
-      !window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)").matches;
-
+    const phone = isPhoneDevice();
     let stopWatch = () => {};
 
     async function load() {
       await seedIfEmpty();
-      const dbUrl = await getDbUrl();
-      if (dbUrl) {
-        await pullBoard({ overwriteMeta: phone }).catch(() => false);
-      } else {
-        await pullSitePack({ overwriteMeta: phone });
-      }
+      await pullSitePack({ overwriteMeta: false }).catch(() => false);
+      await pullBoard({ overwriteMeta: phone }).catch(() => false);
       if (cancelled) return;
       await refresh();
       setReady(true);
-      if (phone && dbUrl) {
+      if (phone) {
         stopWatch = subscribeBoard(() => {
           pullBoard({ overwriteMeta: true })
             .then((changed) => changed && refresh())
             .catch(() => {});
         });
+      } else {
+        queuePublish();
       }
     }
 
     load();
 
     const onVisible = () => {
-      if (document.hidden || !phone) return;
-      getDbUrl().then((dbUrl) =>
-        (dbUrl ? pullBoard({ overwriteMeta: true }) : pullSitePack({ overwriteMeta: true }))
+      if (document.hidden) return;
+      if (phone) {
+        pullBoard({ overwriteMeta: true })
           .then((changed) => changed && refresh())
-          .catch(() => {})
-      );
+          .catch(() => {});
+      } else {
+        queuePublish();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
