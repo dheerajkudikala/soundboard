@@ -12,7 +12,7 @@ import { useDesktop } from "./hooks/useDesktop.js";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { getClipBlob } from "./lib/db.js";
 import { playClip, stopAll } from "./lib/audio.js";
-import { hasGithubToken, schedulePublish } from "./lib/githubSync.js";
+import { schedulePublish } from "./lib/cloudSync.js";
 
 export default function App() {
   const board = useBoard();
@@ -23,7 +23,6 @@ export default function App() {
   const [renameClip, setRenameClip] = useState(null);
   const [editorClip, setEditorClip] = useState(null);
   const [deleteClip, setDeleteClip] = useState(null);
-  const [needsSync, setNeedsSync] = useState(() => typeof window !== "undefined" && !hasGithubToken());
   const friendAddedRef = useRef(null);
 
   useEffect(() => {
@@ -93,12 +92,6 @@ export default function App() {
         ) : null}
       </header>
 
-      {desktop && needsSync ? (
-        <div className="mx-4 mb-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100">
-          Connect GitHub once under Friends / Backup so clips you add here show up on your iPhone.
-        </div>
-      ) : null}
-
       <InstallBanner
         canInstall={install.canInstall}
         showIosTip={install.showIosTip}
@@ -140,7 +133,6 @@ export default function App() {
               board.refresh();
               schedulePublish();
             }}
-            onTokenSaved={() => setNeedsSync(!hasGithubToken())}
           />
         )}
       </main>

@@ -10,7 +10,7 @@ import {
   updateClip,
 } from "../lib/db";
 import { importBundledManifest } from "../lib/boardZip";
-import { pullPublishedBoard, schedulePublish } from "../lib/githubSync";
+import { pullPublishedBoard, schedulePublish } from "../lib/cloudSync";
 
 export function useBoard() {
   const [friends, setFriends] = useState([]);
@@ -28,33 +28,30 @@ export function useBoard() {
       typeof window !== "undefined" &&
       !window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)").matches;
 
-    async function load(fromRemote) {
+    async function load() {
       await seedIfEmpty();
-      if (fromRemote || phone) {
-        try {
-          await pullPublishedBoard();
-        } catch {
-          await importBundledManifest();
-        }
-      } else {
+      try {
+        const got = await pullPublishedBoard();
+        if (!got) await importBundledManifest();
+      } catch {
         await importBundledManifest();
       }
       await refresh();
       setReady(true);
+      if (!phone) schedulePublish();
     }
 
-    load(false);
-    if (!phone) return undefined;
+    load();
 
     const onVisible = () => {
       if (document.hidden) return;
       pullPublishedBoard()
-        .then(() => refresh())
+        .then((got) => got && refresh())
         .catch(() => {});
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
-    const poll = window.setInterval(onVisible, 45000);
+    const poll = window.setInterval(onVisible, 20000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);

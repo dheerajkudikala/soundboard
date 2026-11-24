@@ -53,7 +53,9 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
-              url.pathname.includes("/sounds/") || url.hostname === "raw.githubusercontent.com",
+              url.pathname.includes("/sounds/") ||
+              url.hostname === "raw.githubusercontent.com" ||
+              url.hostname === "rentry.co",
             handler: "NetworkFirst",
             options: {
               cacheName: "soundboard-clips",
