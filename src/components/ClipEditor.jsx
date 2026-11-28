@@ -6,7 +6,7 @@ import { AudioLines, Pause, Play, Save, Scissors, Trash2, Volume2, X } from "luc
 import { getClipBlob, getSourceBlob, saveClip, upsertClip } from "../lib/db";
 import { detectSpeechSegments } from "../lib/segments";
 import { audioBufferToWavBlob, formatTimestamp, sliceBuffer } from "../lib/wav";
-import { decodeBlob, invalidateBuffer, onPlaybackChange, playClip, stopAll, stopClip, unlockAudio, updatePlaybackFx } from "../lib/audio";
+import { decodeBlob, getPlaybackTime, invalidateBuffer, onPlaybackChange, playClip, stopAll, stopClip, unlockAudio, updatePlaybackFx } from "../lib/audio";
 import DeleteClipModal from "./DeleteClipModal.jsx";
 import { cloneAudioBuffer, isolateVoice } from "../lib/voiceIsolate";
 
@@ -25,6 +25,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
   const chunksRef = useRef([]);
   const activeIdRef = useRef("");
   const playheadRef = useRef(0);
+  const playStartRef = useRef(null);
   const mixRef = useRef({ volume: clip.volume ?? 1, rate: clip.playbackRate ?? 1, preservePitch: clip.preservePitch !== false });
 
   const [title, setTitle] = useState(clip.title || "");
@@ -66,9 +67,32 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
 
   useEffect(() => {
     return onPlaybackChange((ids) => {
-      setPlaying(ids.includes("__editor__") || ids.includes("__editor-delete__"));
+      const external = ids.includes("__editor__") || ids.includes("__editor-delete__");
+      setPlaying(external || Boolean(wsRef.current?.isPlaying?.()));
     });
   }, []);
+
+  useEffect(() => {
+    if (!playing || playStartRef.current == null) return undefined;
+    let frame = 0;
+    const tick = () => {
+      const pos = getPlaybackTime("__editor__");
+      const ws = wsRef.current;
+      if (pos != null && ws) {
+        const t = playStartRef.current + pos;
+        playheadRef.current = t;
+        setPlayhead(t);
+        try {
+          ws.setTime(t);
+        } catch {
+          /* ignore */
+        }
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [playing]);
 
   useEffect(() => {
     chunksRef.current = chunks;
@@ -145,7 +169,9 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
         barRadius: 0,
         normalize: true,
         dragToSeek: true,
-        minPxPerSec: 70,
+        autoScroll: true,
+        autoCenter: true,
+        minPxPerSec: 80,
         plugins: [regions, timeline],
       });
       wsRef.current = ws;
@@ -163,17 +189,39 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
       ws.on("finish", () => setPlaying(false));
       const markPlayhead = (time) => {
         if (!Number.isFinite(time)) return;
-        playheadRef.current = time;
-        setPlayhead(time);
+        const dur = ws.getDuration() || 0;
+        const t = Math.max(0, Math.min(time, dur || time));
+        playheadRef.current = t;
+        setPlayhead(t);
+      };
+      const timeFromRelative = (relativeX) => Math.max(0, Math.min(1, Number(relativeX) || 0)) * (ws.getDuration() || 0);
+      const timeFromMouse = (event) => {
+        const wrapper = ws.getWrapper?.() || wrapRef.current;
+        if (!wrapper) return ws.getCurrentTime();
+        const rect = wrapper.getBoundingClientRect();
+        const width = Math.max(1, wrapper.scrollWidth || rect.width);
+        const x = event.clientX - rect.left + (wrapper.scrollLeft || 0);
+        return Math.max(0, Math.min(ws.getDuration() || 0, (x / width) * (ws.getDuration() || 0)));
+      };
+      const seekTo = (time) => {
+        markPlayhead(time);
+        try {
+          ws.setTime(time);
+        } catch {
+          /* ignore */
+        }
       };
       ws.on("interaction", markPlayhead);
+      ws.on("seeking", markPlayhead);
       ws.on("timeupdate", markPlayhead);
-      ws.on("click", markPlayhead);
+      ws.on("audioprocess", markPlayhead);
+      ws.on("click", (relativeX) => seekTo(timeFromRelative(relativeX)));
+      ws.on("drag", (relativeX) => seekTo(timeFromRelative(relativeX)));
       regions.on("region-clicked", (region, event) => {
         event.stopPropagation();
         setActiveId(region.id);
         activeIdRef.current = region.id;
-        markPlayhead(ws.getCurrentTime());
+        seekTo(timeFromMouse(event));
       });
       regions.on("region-updated", (region) => {
         if (paintingRef.current) return;
@@ -218,23 +266,37 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
     return audioBufferToWavBlob(sliceBuffer(buffer, from, to), { fadeMs: 5 });
   }
 
-  async function playSelection() {
+  async function playSelection(from = start, to = end) {
+    const ws = wsRef.current;
+    if (!ws) return;
     try {
-      wsRef.current?.pause();
       stopClip("__editor__");
-      const blob = await renderSlice(start, end);
+      applyMix(ws);
+      playStartRef.current = from;
+      ws.setTime(from);
+      playheadRef.current = from;
+      setPlayhead(from);
       const mix = mixRef.current;
-      await playClip("__editor__", blob, { volume: mix.volume, playbackRate: mix.rate, preservePitch: mix.preservePitch });
-      setPlaying(true);
+      if (mix.volume > 1.001) {
+        ws.setVolume(0);
+        const blob = await renderSlice(from, to);
+        await playClip("__editor__", blob, { volume: mix.volume, playbackRate: mix.rate, preservePitch: mix.preservePitch });
+        setPlaying(true);
+        return;
+      }
+      playStartRef.current = null;
+      await ws.play(from, to);
     } catch (error) {
       setStatus(error.message || "Preview failed.");
     }
   }
 
   function togglePlay() {
+    const ws = wsRef.current;
     if (playing) {
       stopClip("__editor__");
-      wsRef.current?.pause();
+      ws?.pause();
+      playStartRef.current = null;
       setPlaying(false);
       return;
     }
@@ -470,14 +532,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
                   onClick={() => {
                     setActiveId(piece.id);
                     activeIdRef.current = piece.id;
-                    void (async () => {
-                      wsRef.current?.pause();
-                      stopClip("__editor__");
-                      const blob = await renderSlice(piece.start, piece.end);
-                      const mix = mixRef.current;
-                      await playClip("__editor__", blob, { volume: mix.volume, playbackRate: mix.rate, preservePitch: mix.preservePitch });
-                      setPlaying(true);
-                    })();
+                    void playSelection(piece.start, piece.end);
                   }}
                   className="rounded-full bg-white/10 p-2 text-indigo-200"
                   aria-label="Play chunk"

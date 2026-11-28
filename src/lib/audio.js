@@ -212,6 +212,18 @@ export function updatePlaybackFx(id, fx = {}) {
   }
 }
 
+export function getPlaybackTime(id) {
+  const rec = sources.get(id);
+  if (!rec) return null;
+  if (rec.el && Number.isFinite(rec.el.currentTime)) return rec.el.currentTime;
+  if (rec.source && Number.isFinite(rec.startedAt)) {
+    const audio = getAudioContext();
+    const rate = rec.source.playbackRate?.value || 1;
+    return Math.max(0, (audio.currentTime - rec.startedAt) * rate);
+  }
+  return null;
+}
+
 export function isPlaying(id) {
   return sources.has(id);
 }
