@@ -121,16 +121,35 @@ function attachElement(id, el, url) {
   emit();
 }
 
+async function blobFor(id, blob) {
+  if (blob) return blob;
+  const url = primedUrls.get(id);
+  if (!url) return null;
+  const res = await fetch(url);
+  return res.blob();
+}
+
 export async function playClip(id, blob, fx = {}) {
   unlockAudio();
   stopAll();
   const token = ++playToken;
-  const volume = Number.isFinite(fx.volume) ? fx.volume : 1;
+  const volume = Math.max(0, Number.isFinite(fx.volume) ? fx.volume : 1);
   const rate = Number.isFinite(fx.playbackRate) ? fx.playbackRate : 1;
   const preservePitch = fx.preservePitch !== false;
-  const url = primedUrls.get(id) || (blob ? primeClip(id, blob) : null);
-  if (!url) return;
+  const audioBlob = await blobFor(id, blob);
+  const url = primedUrls.get(id) || (audioBlob ? primeClip(id, audioBlob) : null);
+  if (!url && !audioBlob) return;
 
+  if (audioBlob) {
+    try {
+      await playViaWebAudio(id, audioBlob, { volume, rate, token });
+      if (token === playToken && sources.has(id)) return;
+    } catch {
+      /* iOS HTMLAudio fallback below */
+    }
+  }
+
+  if (!url || token !== playToken) return;
   const el = new Audio();
   el.playsInline = true;
   el.setAttribute("playsinline", "true");
@@ -146,18 +165,17 @@ export async function playClip(id, blob, fx = {}) {
     await el.play();
   } catch {
     if (token !== playToken) return;
-    await playViaWebAudio(id, blob, { volume, rate, token });
+    if (audioBlob) await playViaWebAudio(id, audioBlob, { volume, rate, token });
     return;
   }
-  if (token !== playToken) {
-    stopClip(id);
-  }
+  if (token !== playToken) stopClip(id);
 }
 
 async function playViaWebAudio(id, blob, { volume, rate, token }) {
   if (!blob) return;
   const audio = getAudioContext();
   await audio.resume();
+  if (String(id).startsWith("__")) invalidateBuffer(id);
   const buffer = await cacheClip(id, blob);
   if (token !== playToken) return;
   const source = audio.createBufferSource();
@@ -174,7 +192,7 @@ async function playViaWebAudio(id, blob, { volume, rate, token }) {
     }
   };
   source.start(0);
-  sources.set(id, { source, gain, startedAt: audio.currentTime, duration: buffer.duration / rate });
+  sources.set(id, { source, gain, startedAt: audio.currentTime, duration: buffer.duration / Math.max(0.05, rate) });
   emit();
 }
 

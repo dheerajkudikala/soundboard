@@ -6,7 +6,7 @@ import { AudioLines, Pause, Play, Save, Scissors, Trash2, Volume2, X } from "luc
 import { getClipBlob, getSourceBlob, saveClip, upsertClip } from "../lib/db";
 import { detectSpeechSegments } from "../lib/segments";
 import { audioBufferToWavBlob, formatTimestamp, sliceBuffer } from "../lib/wav";
-import { decodeBlob, invalidateBuffer, playClip, stopAll, stopClip, unlockAudio } from "../lib/audio";
+import { decodeBlob, invalidateBuffer, onPlaybackChange, playClip, stopAll, stopClip, unlockAudio } from "../lib/audio";
 import DeleteClipModal from "./DeleteClipModal.jsx";
 import { cloneAudioBuffer, isolateVoice } from "../lib/voiceIsolate";
 
@@ -47,6 +47,12 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
   const active = chunks.find((c) => c.id === activeId) || chunks[0];
   const start = active?.start ?? 0;
   const end = active?.end ?? 0;
+
+  useEffect(() => {
+    return onPlaybackChange((ids) => {
+      setPlaying(ids.includes("__editor__") || ids.includes("__editor-delete__"));
+    });
+  }, []);
 
   useEffect(() => {
     chunksRef.current = chunks;
@@ -174,31 +180,32 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
     setChunks((list) => list.map((piece) => (piece.id === active.id ? { ...piece, start: s, end: e } : piece)));
   }
 
-  function preview() {
-    wsRef.current?.play(start, end);
-  }
-
   async function renderSlice(from, to) {
     const buffer = sourceBufferRef.current;
     if (!buffer) throw new Error("Audio is still loading.");
     return audioBufferToWavBlob(sliceBuffer(buffer, from, to), { fadeMs: 5 });
   }
 
-  async function previewMix() {
+  async function playSelection() {
     try {
+      wsRef.current?.pause();
       stopClip("__editor__");
       const blob = await renderSlice(start, end);
       await playClip("__editor__", blob, { volume, playbackRate: rate, preservePitch });
+      setPlaying(true);
     } catch (error) {
       setStatus(error.message || "Preview failed.");
     }
   }
 
   function togglePlay() {
-    const ws = wsRef.current;
-    if (!ws) return;
-    if (playing) ws.pause();
-    else ws.play();
+    if (playing) {
+      stopClip("__editor__");
+      wsRef.current?.pause();
+      setPlaying(false);
+      return;
+    }
+    void playSelection();
   }
 
   async function persistOriginal(from, to) {
@@ -344,30 +351,6 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
     setStatus("Tightened this chunk to audible audio.");
   }
 
-  function splitSilentGaps() {
-    const buffer = sourceBufferRef.current;
-    if (!buffer || !active) return;
-    const slice = sliceBuffer(buffer, start, end);
-    const segs = detectSpeechSegments(slice);
-    if (segs.length < 2) {
-      setStatus("Not enough gaps. Tap a cut point and use Split, or Strip silence.");
-      return;
-    }
-    const pieces = segs.map((seg, index) => ({
-      id: index === 0 ? active.id : chunkId(),
-      start: start + seg.start,
-      end: start + seg.end,
-    }));
-    setChunks((list) => {
-      const index = list.findIndex((c) => c.id === active.id);
-      const next = [...list];
-      next.splice(index, 1, ...pieces);
-      return next;
-    });
-    setActiveId(pieces[0].id);
-    setStatus(`${pieces.length} sound chunks. Delete the ones you don’t want, then Save.`);
-  }
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/95 px-4 py-4 backdrop-blur-md" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
       <div className="mx-auto max-w-5xl space-y-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
@@ -376,7 +359,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
             <p className="text-[11px] uppercase tracking-[0.18em] text-indigo-300">Clip editor</p>
             <h2 className="text-lg font-semibold">{hasSource ? "Full recording context" : "Edit saved clip"}</h2>
             <p className="mt-1 text-xs text-zinc-500">
-              Tap the waveform to place the playhead, Split, then Delete any chunk you don’t want.
+              Play uses the volume and speed below. Split at the playhead, delete leftover chunks, then Save.
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full border border-white/10 p-2 text-zinc-300" aria-label="Close editor">
@@ -394,23 +377,14 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={togglePlay} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-sm">
-            {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? "Pause" : "Play all"}
-          </button>
-          <button type="button" onClick={preview} className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-2 text-sm text-indigo-200">
-            Preview chunk
-          </button>
-          <button type="button" onClick={previewMix} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-sm">
-            Preview mix
+          <button type="button" onClick={togglePlay} className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-2 text-sm font-semibold text-indigo-100">
+            {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? "Stop" : "Play"}
           </button>
           <button type="button" onClick={splitAtPlayhead} className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-sm font-semibold">
-            <Scissors size={14} /> Split at playhead
+            <Scissors size={14} /> Split
           </button>
           <button type="button" onClick={stripSilence} className="rounded-full bg-white/10 px-3 py-2 text-sm">
-            Strip silence
-          </button>
-          <button type="button" onClick={splitSilentGaps} className="rounded-full bg-white/10 px-3 py-2 text-sm">
-            Split quiet gaps
+            Trim silence
           </button>
           <button
             type="button"
@@ -446,7 +420,14 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
                   type="button"
                   onClick={() => {
                     setActiveId(piece.id);
-                    wsRef.current?.play(piece.start, piece.end);
+                    activeIdRef.current = piece.id;
+                    void (async () => {
+                      wsRef.current?.pause();
+                      stopClip("__editor__");
+                      const blob = await renderSlice(piece.start, piece.end);
+                      await playClip("__editor__", blob, { volume, playbackRate: rate, preservePitch });
+                      setPlaying(true);
+                    })();
                   }}
                   className="rounded-full bg-white/10 p-2 text-indigo-200"
                   aria-label="Play chunk"
@@ -498,14 +479,30 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
 
         <section className="space-y-3 rounded-3xl border border-white/10 bg-zinc-900/50 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <Volume2 size={16} className="text-indigo-300" /> Mix
+            <Volume2 size={16} className="text-indigo-300" /> Volume & speed
           </div>
-          <label className="block">
+          <div>
             <span className="mb-1 flex justify-between text-[11px] text-zinc-500">
               Volume <span>{Math.round(volume * 100)}%</span>
             </span>
-            <input type="range" min="0" max="3" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="w-full accent-indigo-500" />
-          </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setVolume((v) => Math.max(0, Math.round((v - 0.1) * 20) / 20))}
+                className="rounded-full bg-white/10 px-2.5 py-1 text-xs"
+              >
+                −
+              </button>
+              <input type="range" min="0" max="3" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="w-full accent-indigo-500" />
+              <button
+                type="button"
+                onClick={() => setVolume((v) => Math.min(3, Math.round((v + 0.1) * 20) / 20))}
+                className="rounded-full bg-white/10 px-2.5 py-1 text-xs"
+              >
+                +
+              </button>
+            </div>
+          </div>
           <label className="block">
             <span className="mb-1 flex justify-between text-[11px] text-zinc-500">
               Speed / pitch <span>{rate.toFixed(2)}x</span>

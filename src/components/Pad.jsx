@@ -1,7 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getClipBlob } from "../lib/db";
-import { hasPrimedClip, onPlaybackChange, playClip, primeClip, stopClip, unlockAudio } from "../lib/audio";
+import { onPlaybackChange, playClip, primeClip, stopClip, unlockAudio } from "../lib/audio";
 
 export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
   const [playing, setPlaying] = useState(false);
@@ -31,10 +31,6 @@ export default function Pad({ clip, friend, playOnly, onRename, onDelete }) {
       playbackRate: clip.playbackRate ?? 1,
       preservePitch: clip.preservePitch !== false,
     };
-    if (hasPrimedClip(clip.id)) {
-      void playClip(clip.id, null, fx);
-      return;
-    }
     void getClipBlob(clip.id).then((blob) => {
       if (blob) return playClip(clip.id, blob, fx);
     });
