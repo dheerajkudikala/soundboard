@@ -196,6 +196,22 @@ async function playViaWebAudio(id, blob, { volume, rate, token }) {
   emit();
 }
 
+export function updatePlaybackFx(id, fx = {}) {
+  const rec = sources.get(id);
+  if (!rec) return;
+  const volume = Math.max(0, Number.isFinite(fx.volume) ? fx.volume : 1);
+  const rate = Number.isFinite(fx.playbackRate) ? fx.playbackRate : 1;
+  const preservePitch = fx.preservePitch !== false;
+  if (rec.gain) rec.gain.gain.value = volume;
+  if (rec.source?.playbackRate) rec.source.playbackRate.value = Math.min(2, Math.max(0.5, rate));
+  if (rec.el) {
+    rec.el.volume = Math.max(0, Math.min(1, volume));
+    rec.el.playbackRate = Math.min(2, Math.max(0.5, rate));
+    rec.el.preservesPitch = preservePitch;
+    rec.el.webkitPreservesPitch = preservePitch;
+  }
+}
+
 export function isPlaying(id) {
   return sources.has(id);
 }

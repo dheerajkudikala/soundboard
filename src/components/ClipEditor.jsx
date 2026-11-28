@@ -6,7 +6,7 @@ import { AudioLines, Pause, Play, Save, Scissors, Trash2, Volume2, X } from "luc
 import { getClipBlob, getSourceBlob, saveClip, upsertClip } from "../lib/db";
 import { detectSpeechSegments } from "../lib/segments";
 import { audioBufferToWavBlob, formatTimestamp, sliceBuffer } from "../lib/wav";
-import { decodeBlob, invalidateBuffer, onPlaybackChange, playClip, stopAll, stopClip, unlockAudio } from "../lib/audio";
+import { decodeBlob, invalidateBuffer, onPlaybackChange, playClip, stopAll, stopClip, unlockAudio, updatePlaybackFx } from "../lib/audio";
 import DeleteClipModal from "./DeleteClipModal.jsx";
 import { cloneAudioBuffer, isolateVoice } from "../lib/voiceIsolate";
 
@@ -25,6 +25,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
   const chunksRef = useRef([]);
   const activeIdRef = useRef("");
   const playheadRef = useRef(0);
+  const mixRef = useRef({ volume: clip.volume ?? 1, rate: clip.playbackRate ?? 1, preservePitch: clip.preservePitch !== false });
 
   const [title, setTitle] = useState(clip.title || "");
   const [friendId, setFriendId] = useState(clip.friendId || friends[0]?.id || "");
@@ -47,6 +48,21 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
   const active = chunks.find((c) => c.id === activeId) || chunks[0];
   const start = active?.start ?? 0;
   const end = active?.end ?? 0;
+
+  useEffect(() => {
+    mixRef.current = { volume, rate, preservePitch };
+    const ws = wsRef.current;
+    if (ws) {
+      try {
+        ws.setVolume(Math.max(0, Math.min(1, volume)));
+        ws.setPlaybackRate(rate, preservePitch);
+      } catch {
+        /* wavesurfer not ready */
+      }
+    }
+    updatePlaybackFx("__editor__", { volume, playbackRate: rate, preservePitch });
+    updatePlaybackFx("__editor-delete__", { volume, playbackRate: rate, preservePitch });
+  }, [volume, rate, preservePitch]);
 
   useEffect(() => {
     return onPlaybackChange((ids) => {
@@ -133,7 +149,16 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
         plugins: [regions, timeline],
       });
       wsRef.current = ws;
-      ws.on("play", () => setPlaying(true));
+      ws.on("play", () => {
+        const mix = mixRef.current;
+        try {
+          ws.setVolume(Math.max(0, Math.min(1, mix.volume)));
+          ws.setPlaybackRate(mix.rate, mix.preservePitch);
+        } catch {
+          /* ignore */
+        }
+        setPlaying(true);
+      });
       ws.on("pause", () => setPlaying(false));
       ws.on("finish", () => setPlaying(false));
       const markPlayhead = (time) => {
@@ -158,6 +183,13 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
       });
       await ws.loadBlob(blob);
       ws.setTime(nextStart);
+      try {
+        const mix = mixRef.current;
+        ws.setVolume(Math.max(0, Math.min(1, mix.volume)));
+        ws.setPlaybackRate(mix.rate, mix.preservePitch);
+      } catch {
+        /* ignore */
+      }
       paintChunks([first], first.id);
     })();
     return () => {
@@ -191,7 +223,8 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
       wsRef.current?.pause();
       stopClip("__editor__");
       const blob = await renderSlice(start, end);
-      await playClip("__editor__", blob, { volume, playbackRate: rate, preservePitch });
+      const mix = mixRef.current;
+      await playClip("__editor__", blob, { volume: mix.volume, playbackRate: mix.rate, preservePitch: mix.preservePitch });
       setPlaying(true);
     } catch (error) {
       setStatus(error.message || "Preview failed.");
@@ -310,16 +343,30 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
     }
   }
 
+  function applyMix(ws = wsRef.current) {
+    if (!ws) return;
+    const mix = mixRef.current;
+    try {
+      ws.setVolume(Math.max(0, Math.min(1, mix.volume)));
+      ws.setPlaybackRate(mix.rate, mix.preservePitch);
+    } catch {
+      /* wavesurfer media not ready */
+    }
+  }
+
   async function toggleIsolate() {
     const original = originalBufferRef.current || sourceBufferRef.current;
     const ws = wsRef.current;
     if (!original || !ws || isolating) return;
+    const time = playheadRef.current;
     if (isolated) {
       sourceBufferRef.current = original;
       await ws.loadBlob(audioBufferToWavBlob(original, { fadeMs: 2 }));
-      setIsolated(false);
+      ws.setTime(Math.min(time, ws.getDuration() || time));
+      applyMix(ws);
       paintChunks();
-      setStatus("Restored original audio.");
+      setIsolated(false);
+      setStatus("Restored original audio. Volume and speed still apply.");
       return;
     }
     setIsolating(true);
@@ -328,9 +375,11 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
       const cleaned = await isolateVoice(original, (message) => setStatus(message));
       sourceBufferRef.current = cleaned;
       await ws.loadBlob(audioBufferToWavBlob(cleaned, { fadeMs: 2 }));
-      setIsolated(true);
+      ws.setTime(Math.min(time, ws.getDuration() || time));
+      applyMix(ws);
       paintChunks();
-      setStatus("Voice isolated. Preview, then Save so only the voice is on the pad.");
+      setIsolated(true);
+      setStatus("Voice isolated. Volume and speed still work — adjust them, Play, then Save.");
     } catch (error) {
       setStatus(error.message || "Could not isolate voice.");
     } finally {
@@ -425,7 +474,8 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
                       wsRef.current?.pause();
                       stopClip("__editor__");
                       const blob = await renderSlice(piece.start, piece.end);
-                      await playClip("__editor__", blob, { volume, playbackRate: rate, preservePitch });
+                      const mix = mixRef.current;
+                      await playClip("__editor__", blob, { volume: mix.volume, playbackRate: mix.rate, preservePitch: mix.preservePitch });
                       setPlaying(true);
                     })();
                   }}
@@ -480,6 +530,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
         <section className="space-y-3 rounded-3xl border border-white/10 bg-zinc-900/50 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Volume2 size={16} className="text-indigo-300" /> Volume & speed
+            {isolated ? <span className="text-[11px] font-medium text-emerald-300">applies to isolated voice</span> : null}
           </div>
           <div>
             <span className="mb-1 flex justify-between text-[11px] text-zinc-500">
