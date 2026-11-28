@@ -277,7 +277,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
       playheadRef.current = from;
       setPlayhead(from);
       const mix = mixRef.current;
-      if (mix.volume > 1.001) {
+      if (mix.volume !== 1) {
         ws.setVolume(0);
         const blob = await renderSlice(from, to);
         await playClip("__editor__", blob, { volume: mix.volume, playbackRate: mix.rate, preservePitch: mix.preservePitch });
@@ -285,6 +285,7 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
         return;
       }
       playStartRef.current = null;
+      ws.setVolume(1);
       await ws.play(from, to);
     } catch (error) {
       setStatus(error.message || "Preview failed.");
@@ -436,12 +437,14 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
     try {
       const cleaned = await isolateVoice(original, (message) => setStatus(message));
       sourceBufferRef.current = cleaned;
+      mixRef.current = { ...mixRef.current, volume: 1 };
+      setVolume(1);
       await ws.loadBlob(audioBufferToWavBlob(cleaned, { fadeMs: 2 }));
       ws.setTime(Math.min(time, ws.getDuration() || time));
       applyMix(ws);
       paintChunks();
       setIsolated(true);
-      setStatus("Voice isolated. Volume and speed still work — adjust them, Play, then Save.");
+      setStatus("Voice isolated and leveled to 100%. Use + if you still want it louder, then Save.");
     } catch (error) {
       setStatus(error.message || "Could not isolate voice.");
     } finally {
@@ -599,10 +602,10 @@ export default function ClipEditor({ clip, friends, onClose, onSaved }) {
               >
                 −
               </button>
-              <input type="range" min="0" max="3" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="w-full accent-indigo-500" />
+              <input type="range" min="0" max="4" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="w-full accent-indigo-500" />
               <button
                 type="button"
-                onClick={() => setVolume((v) => Math.min(3, Math.round((v + 0.1) * 20) / 20))}
+                onClick={() => setVolume((v) => Math.min(4, Math.round((v + 0.1) * 20) / 20))}
                 className="rounded-full bg-white/10 px-2.5 py-1 text-xs"
               >
                 +

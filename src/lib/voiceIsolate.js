@@ -141,16 +141,19 @@ function gate(samples, sampleRate) {
   }
 }
 
-function matchPeak(out, original) {
-  let a = 0;
-  let b = 0;
+function loudnessNormalize(out) {
+  let peak = 0;
+  let sum = 0;
   for (let i = 0; i < out.length; i += 1) {
-    a = Math.max(a, Math.abs(original[i]));
-    b = Math.max(b, Math.abs(out[i]));
+    const a = Math.abs(out[i]);
+    peak = Math.max(peak, a);
+    sum += out[i] * out[i];
   }
-  if (b < 1e-8) return;
-  const scale = Math.min(0.98, (a * 0.92) / b);
-  for (let i = 0; i < out.length; i += 1) out[i] *= scale;
+  if (peak < 1e-8) return;
+  const rms = Math.sqrt(sum / out.length);
+  let scale = 0.9 / peak;
+  if (rms * scale < 0.14) scale = Math.min(0.95 / peak, 0.14 / Math.max(rms, 1e-8));
+  for (let i = 0; i < out.length; i += 1) out[i] = Math.max(-1, Math.min(1, out[i] * scale));
 }
 
 export function cloneAudioBuffer(buffer) {
@@ -267,7 +270,7 @@ export async function isolateVoice(buffer, onProgress) {
     out[i] = ola[i] / Math.max(1e-8, norm[i]);
   }
   gate(out, sr);
-  matchPeak(out, input);
+  loudnessNormalize(out);
 
   const audio = getAudioContext();
   const result = audio.createBuffer(1, out.length, sr);
